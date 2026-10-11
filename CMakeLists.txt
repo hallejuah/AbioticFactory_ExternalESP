@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(AbioticESP WIN32
     src/main.cpp src/process.cpp src/ue5.cpp src/scanner.cpp
-    src/overlay.cpp src/settings.cpp src/mesh_probe.cpp src/outline_probe.cpp src/reflection_probe.cpp)
+    src/overlay.cpp src/settings.cpp src/mesh_probe.cpp src/outline_probe.cpp src/reflection_probe.cpp src/property_chain.cpp)
 target_include_directories(AbioticESP PRIVATE include)
 target_compile_definitions(AbioticESP PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(AbioticESP PRIVATE bcrypt user32 gdi32 dwmapi comctl32 shell32)

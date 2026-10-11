@@ -22,6 +22,7 @@ private:
     void probeNearestEnemy();
     void probeNearestOutline();
     void probeNearestReflection();
+    void probeNearestProperties();
     struct ActorSample { Vec3 pos{}; Life life{}; bool valid{}; };
     std::unordered_map<Addr,ActorSample> actorSamples_;
     ULONGLONG lastActorSample_{};
