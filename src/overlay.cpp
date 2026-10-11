@@ -11,7 +11,7 @@
 namespace abiotic {
 namespace {
 constexpr COLORREF Transparent=RGB(1,2,3);
-constexpr int HotInterval=100;
+constexpr int HotInterval=16; // ~60 Hz projection / paint
 constexpr int ID_TAB_BASE=500, ID_CHECK_BASE=550, ID_DEC_BASE=650, ID_INC_BASE=750;
 struct Box {RECT r;};
 BOOL CALLBACK enumGame(HWND hwnd,LPARAM param){
@@ -67,7 +67,7 @@ bool Overlay::reconnect(){
     proc_.detach();
     ue_.clearCaches();
     scanner_.reset();
-    rows_.clear();
+    rows_.clear();actorSamples_.clear();lastActorSample_=0;
     game_=nullptr;
     gameRect_={};
     connected_=false;
@@ -168,7 +168,7 @@ void Overlay::tick(){
     const ULONGLONG now=GetTickCount64();
     if(connected_&&(!proc_.alive()||!IsWindow(game_))){
         connected_=false;game_=nullptr;gameRect_={};
-        scanner_.reset();ue_.clearCaches();rows_.clear();
+        scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
         proc_.detach();scanRequested_=false;
         status_=L"Game closed; waiting to reconnect";
     }
@@ -180,7 +180,7 @@ void Overlay::tick(){
     geometry();
     if(now-lastChainCheck_>=3000){
         lastChainCheck_=now;
-        if(scanner_.identityChanged()){scanRequested_=true;rows_.clear();}
+        if(scanner_.identityChanged()){scanRequested_=true;rows_.clear();actorSamples_.clear();lastActorSample_=0;}
     }
     if(scanRequested_||now-lastScan_>=(ULONGLONG)cfg_.scanIntervalSeconds*1000){
         std::string err;
@@ -191,6 +191,7 @@ void Overlay::tick(){
         scanAvgMs_+=(scanLastMs_-scanAvgMs_)/static_cast<double>(scanCount_);
         lastScan_=now;scanRequested_=false;
         if(success){
+            actorSamples_.clear();lastActorSample_=0;
             status_=L"Actors: "+std::to_wstring(scanner_.data().actors.size())+L" | scan OK";
         }else{
             ++scanErrors_;
@@ -218,16 +219,30 @@ void Overlay::tick(){
        !snapshot.cameraManager||!ue_.readCamera(snapshot.cameraManager,cam)){
         InvalidateRect(overlay_,nullptr,FALSE);return;
     }
+    // Position/health samples are refreshed at 30 Hz, while the latest camera is
+    // sampled and reprojected at ~60 Hz to reduce camera-motion label stepping.
+    const bool sampleActors = !lastActorSample_ || now-lastActorSample_>=33;
+    if(sampleActors)lastActorSample_=now;
     for(const auto& actor:snapshot.actors){
         if(!cfg_.enabled(actor.category))continue;
-        Vec3 pos{};if(!ue_.actorPos(actor.address,pos))continue;
-        ScreenPoint pt=project(cam,pos,w,h);
+        auto& sample=actorSamples_[actor.address];
+        if(sampleActors || !sample.valid){
+            Vec3 pos{};
+            sample.valid=ue_.actorPos(actor.address,pos);
+            if(sample.valid){
+                sample.pos=pos;
+                if(actor.category==Category::Hostile)
+                    sample.life=ue_.life(actor.address,actor.name=="NPC_Robot_Security_C");
+            }
+        }
+        if(!sample.valid)continue;
+        ScreenPoint pt=project(cam,sample.pos,w,h);
         if(!pt.visible)continue;
         bool loot=actor.category==Category::Dropped||actor.category==Category::MicroLoot||actor.category==Category::ResourceNode;
         if(pt.distance>(loot?cfg_.lootDistance:cfg_.maxDistance))continue;
         Row row;row.actor=actor;row.screen=pt;
         if(actor.category==Category::Hostile){
-            row.life=ue_.life(actor.address,actor.name=="NPC_Robot_Security_C");row.hasLife=row.life.valid;
+            row.life=sample.life;row.hasLife=row.life.valid;
             if(cfg_.hideDead&&verifiedLife(actor.name)&&row.hasLife&&row.life.hp<=0.001&&row.life.dead)continue;
         }
         rows_.push_back(std::move(row));
