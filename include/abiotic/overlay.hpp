@@ -21,6 +21,7 @@ private:
     void drawRow(HDC, const Row&);
     void probeNearestEnemy();
     void probeNearestOutline();
+    void probeNearestReflection();
     struct ActorSample { Vec3 pos{}; Life life{}; bool valid{}; };
     std::unordered_map<Addr,ActorSample> actorSamples_;
     ULONGLONG lastActorSample_{};
