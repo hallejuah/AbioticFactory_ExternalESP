@@ -15,6 +15,8 @@ void loadSettings(Config& c){
     b(L"dropped",c.dropped);b(L"micro",c.micro);b(L"resource",c.resource);
     b(L"showHp",c.showHp);b(L"hideDead",c.hideDead);b(L"showBars",c.showBars);
     b(L"showArmor",c.showArmor);b(L"focusOnly",c.focusOnly);
+    b(L"skeletonDebug",c.skeletonDebug);
+    b(L"skeletonDebug",c.skeletonDebug);
     n(L"maxLabels",c.maxLabels,1,250);n(L"maxDistance",c.maxDistance,100,50000);
     n(L"lootDistance",c.lootDistance,100,50000);n(L"fontSize",c.fontSize,8,25);
     n(L"barWidth",c.barWidth,24,240);n(L"barHeight",c.barHeight,3,24);
