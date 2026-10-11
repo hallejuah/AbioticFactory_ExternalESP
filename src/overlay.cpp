@@ -11,7 +11,7 @@
 namespace abiotic {
 namespace {
 constexpr COLORREF Transparent=RGB(1,2,3);
-constexpr int HotInterval=100;
+constexpr int HotInterval=16; // ~60 Hz projection / paint
 constexpr int ID_TAB_BASE=500, ID_CHECK_BASE=550, ID_DEC_BASE=650, ID_INC_BASE=750;
 struct Box {RECT r;};
 BOOL CALLBACK enumGame(HWND hwnd,LPARAM param){
@@ -67,7 +67,7 @@ bool Overlay::reconnect(){
     proc_.detach();
     ue_.clearCaches();
     scanner_.reset();
-    rows_.clear();
+    rows_.clear();actorSamples_.clear();lastActorSample_=0;
     game_=nullptr;
     gameRect_={};
     connected_=false;
@@ -168,7 +168,7 @@ void Overlay::tick(){
     const ULONGLONG now=GetTickCount64();
     if(connected_&&(!proc_.alive()||!IsWindow(game_))){
         connected_=false;game_=nullptr;gameRect_={};
-        scanner_.reset();ue_.clearCaches();rows_.clear();
+        scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
         proc_.detach();scanRequested_=false;
         status_=L"Game closed; waiting to reconnect";
     }
@@ -180,7 +180,7 @@ void Overlay::tick(){
     geometry();
     if(now-lastChainCheck_>=3000){
         lastChainCheck_=now;
-        if(scanner_.identityChanged()){scanRequested_=true;rows_.clear();}
+        if(scanner_.identityChanged()){scanRequested_=true;rows_.clear();actorSamples_.clear();lastActorSample_=0;}
     }
     if(scanRequested_||now-lastScan_>=(ULONGLONG)cfg_.scanIntervalSeconds*1000){
         std::string err;
@@ -191,6 +191,7 @@ void Overlay::tick(){
         scanAvgMs_+=(scanLastMs_-scanAvgMs_)/static_cast<double>(scanCount_);
         lastScan_=now;scanRequested_=false;
         if(success){
+            actorSamples_.clear();lastActorSample_=0;
             status_=L"Actors: "+std::to_wstring(scanner_.data().actors.size())+L" | scan OK";
         }else{
             ++scanErrors_;
