@@ -20,7 +20,7 @@ struct Config {
     bool active{true}, hideDead{true}, showHp{true}, showBars{true}, showArmor{true};
     bool hostile{true}, narrative{true}, container{true}, dropped{true}, micro{true}, resource{true};
     bool focusOnly{true};
-    bool skeletonDebug{false};
+    int skeletonMode{0}; // 0=off, 1=numbered points, 2=points and tentative links
     int maxLabels{45}, fontSize{11}, barWidth{62}, barHeight{7};
     int maxDistance{3500}, lootDistance{1800};
     int scanIntervalSeconds{12};
