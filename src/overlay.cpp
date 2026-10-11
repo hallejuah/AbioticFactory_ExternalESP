@@ -4,6 +4,7 @@
 #include "abiotic/reflection_probe.hpp"
 #include "abiotic/property_chain.hpp"
 #include "abiotic/property_values.hpp"
+#include "abiotic/bone_probe.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cwchar>
@@ -167,7 +168,7 @@ void Overlay::hotkeys(){
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
     if(edge(VK_F11))probeNearestEnemy();
-    if(edge(VK_F12))probeNearestPropertyValues(); // F12: v1.0 property values
+    if(edge(VK_F12))probeNearestBones(); // F12: v1.1 bone diagnostic
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -470,7 +471,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit.  No injection or writes.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"F11: mesh  F12: property values probe",0,18,330,310,22);
+        add(L"STATIC",L"F11: mesh  F12: bone diagnostics",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
