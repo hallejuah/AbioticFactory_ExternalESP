@@ -19,6 +19,9 @@ private:
     void toggleCategory(Category category);
     bool focused()const;
     void drawRow(HDC, const Row&);
+    struct ActorSample { Vec3 pos{}; Life life{}; bool valid{}; };
+    std::unordered_map<Addr,ActorSample> actorSamples_;
+    ULONGLONG lastActorSample_{};
     void onCommand(WPARAM,LPARAM);
     void onScroll(WPARAM,LPARAM);
     bool reconnect();
