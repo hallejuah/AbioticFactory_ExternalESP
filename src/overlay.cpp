@@ -168,7 +168,8 @@ void Overlay::hotkeys(){
     if(edge(VK_F8))cfg_.active=!cfg_.active;
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
-    if(edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;}
+    if(edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;
+        if(panelOpen_)updatePanel();}
     if(edge(VK_F11))probeNearestEnemy();
     if(edge(VK_F12))probeNearestBones(); // F12: v1.1 bone diagnostic
 }
