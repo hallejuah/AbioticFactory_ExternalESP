@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.21)
+project(AbioticExternalESP VERSION 0.1.0 LANGUAGES CXX)
+if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(FATAL_ERROR "Windows x64 required")
+endif()
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_executable(AbioticESP WIN32
+    src/main.cpp src/process.cpp src/ue5.cpp src/scanner.cpp
+    src/overlay.cpp src/settings.cpp)
+target_include_directories(AbioticESP PRIVATE include)
+target_compile_definitions(AbioticESP PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AbioticESP PRIVATE bcrypt user32 gdi32 dwmapi comctl32 shell32)
+if(MSVC)
+    target_compile_options(AbioticESP PRIVATE /W4 /EHsc /utf-8)
+endif()
+set_target_properties(AbioticESP PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:AbioticESP>")
