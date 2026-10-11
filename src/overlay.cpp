@@ -74,6 +74,7 @@ bool Overlay::reconnect(){
     ue_.clearCaches();
     scanner_.reset();
     rows_.clear();actorSamples_.clear();lastActorSample_=0;
+    boneDebugPoints_.clear();lastBoneSample_=0;
     game_=nullptr;
     gameRect_={};
     connected_=false;
@@ -167,6 +168,7 @@ void Overlay::hotkeys(){
     if(edge(VK_F8))cfg_.active=!cfg_.active;
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
+    if(edge('B')){cfg_.skeletonDebug=!cfg_.skeletonDebug;boneDebugPoints_.clear();lastBoneSample_=0;}
     if(edge(VK_F11))probeNearestEnemy();
     if(edge(VK_F12))probeNearestBones(); // F12: v1.1 bone diagnostic
 }
@@ -301,6 +303,7 @@ void Overlay::tick(){
     if(connected_&&(!proc_.alive()||!IsWindow(game_))){
         connected_=false;game_=nullptr;gameRect_={};
         scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
+        boneDebugPoints_.clear();lastBoneSample_=0;
         proc_.detach();scanRequested_=false;
         status_=L"Game closed; waiting to reconnect";
     }
@@ -386,6 +389,21 @@ void Overlay::tick(){
         return x==y?a.screen.distance<b.screen.distance:x<y;
     });
     if((int)rows_.size()>cfg_.maxLabels)rows_.resize(cfg_.maxLabels);
+    if(!cfg_.skeletonDebug)boneDebugPoints_.clear();
+    else if(!lastBoneSample_||now-lastBoneSample_>=50){
+        lastBoneSample_=now;
+        boneDebugPoints_.clear();
+        // One Pest only: no unknown skeleton layouts for other enemy types.
+        const Row* chosen=nullptr;
+        double best=1.0e100;
+        for(const auto& row:rows_){
+            if(row.actor.name!="NPC_Monster_Pest_C")continue;
+            const double dx=row.screen.x-w*0.5,dy=row.screen.y-h*0.5;
+            const double d=dx*dx+dy*dy;
+            if(d<best){best=d;chosen=&row;}
+        }
+        if(chosen)boneDebugPoints_=projectPestBones(ue_,chosen->actor.address,cam,w,h);
+    }
     InvalidateRect(overlay_,nullptr,FALSE);
 }
 void Overlay::paint(HDC dc){
@@ -394,6 +412,22 @@ void Overlay::paint(HDC dc){
     SetBkMode(dc,TRANSPARENT);
     if(!cfg_.active||!focused()&&cfg_.focusOnly)return;
     for(auto& row:rows_)drawRow(dc,row);
+    if(cfg_.skeletonDebug)drawBoneDebug(dc);
+}
+void Overlay::drawBoneDebug(HDC dc){
+    auto oldPen=SelectObject(dc,GetStockObject(DC_PEN));
+    SetDCPenColor(dc,RGB(102,255,245));
+    auto oldBrush=SelectObject(dc,GetStockObject(NULL_BRUSH));
+    for(const auto& point:boneDebugPoints_){
+        const int x=static_cast<int>(std::lround(point.screen.x));
+        const int y=static_cast<int>(std::lround(point.screen.y));
+        Ellipse(dc,x-4,y-4,x+5,y+5);
+        const std::wstring n=std::to_wstring(point.index);
+        SetTextColor(dc,RGB(102,255,245));
+        TextOutW(dc,x+7,y-7,n.c_str(),static_cast<int>(n.size()));
+    }
+    SelectObject(dc,oldBrush);
+    SelectObject(dc,oldPen);
 }
 void Overlay::drawRow(HDC dc,const Row& row){
     auto x=(int)std::lround(row.screen.x),y=(int)std::lround(row.screen.y);
@@ -487,9 +521,10 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"Values apply immediately.",0,18,226,310,20);break;
       case 3:
         chk(L"Only when game/menu focused",10,cfg_.focusOnly,60);
-        step(L"Scan interval",6,cfg_.scanIntervalSeconds,L"s",115);
+        chk(L"Skeleton debug (Pest only)",11,cfg_.skeletonDebug,88);
+        step(L"Scan interval",6,cfg_.scanIntervalSeconds,L"s",130);
         add(L"STATIC",L"F3/F4/F5: loot    F6: HP    F7: dead",0,18,168,310,22);
-        add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
+        add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel    B: bones",0,18,195,310,22);
         add(L"STATIC",L"End: exit.  No injection or writes.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
         add(L"STATIC",L"F11: mesh  F12: bone diagnostics",0,18,330,310,22);
@@ -502,7 +537,7 @@ void Overlay::updatePanel(){
 void Overlay::onCommand(WPARAM wp,LPARAM){
     int id=LOWORD(wp);
     if(id>=ID_TAB_BASE&&id<ID_TAB_BASE+4){page_=id-ID_TAB_BASE;updatePanel();return;}
-    if(id>=ID_CHECK_BASE&&id<ID_CHECK_BASE+11){
+    if(id>=ID_CHECK_BASE&&id<ID_CHECK_BASE+12){
         switch(id-ID_CHECK_BASE){
         case 0:cfg_.hostile=!cfg_.hostile;break;case 1:cfg_.narrative=!cfg_.narrative;break;
         case 2:cfg_.container=!cfg_.container;break;case 3:cfg_.dropped=!cfg_.dropped;break;
@@ -510,6 +545,7 @@ void Overlay::onCommand(WPARAM wp,LPARAM){
         case 6:cfg_.showHp=!cfg_.showHp;break;case 7:cfg_.showBars=!cfg_.showBars;break;
         case 8:cfg_.hideDead=!cfg_.hideDead;break;case 9:cfg_.showArmor=!cfg_.showArmor;break;
         case 10:cfg_.focusOnly=!cfg_.focusOnly;break;
+        case 11:cfg_.skeletonDebug=!cfg_.skeletonDebug;boneDebugPoints_.clear();lastBoneSample_=0;break;
         }return;
     }
     if((id>=ID_DEC_BASE&&id<ID_DEC_BASE+7)||(id>=ID_INC_BASE&&id<ID_INC_BASE+7)){
