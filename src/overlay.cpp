@@ -49,26 +49,51 @@ std::wstring formatNum(double n,int decimals=0){std::wostringstream ss;ss<<std::
 }
 Overlay::Overlay(HINSTANCE instance):instance_(instance),ue_(proc_),scanner_(ue_){loadSettings(cfg_);}
 int Overlay::run(){
-    try {proc_.attach();}
-    catch(const std::exception& e){
-        std::string msg="Read-only game attach refused: ";msg+=e.what();
-        MessageBoxA(nullptr,msg.c_str(),"Abiotic External ESP",MB_ICONERROR);return 1;
-    }
-    game_=gameWindow(proc_.pid());
-    if(!game_){MessageBoxW(nullptr,L"Game window missing. Use borderless/windowed mode.",L"Abiotic ESP",MB_ICONERROR);return 1;}
+    // Keep the UI alive when the game has not started or has been restarted.
     if(!initialize())return 1;
-    std::string err;
-    if(!scanner_.refresh(err)){
-        status_=L"Initial scan delayed; waiting for level streaming";
-        OutputDebugStringA(("Abiotic ESP initial scan: "+err+"\n").c_str());
-    }
-    lastScan_=GetTickCount64();
+    connected_=false;
+    status_=L"Waiting for Abiotic Factor...";
     SetTimer(overlay_,1,HotInterval,nullptr);
+    reconnect();
     MSG msg{};
     while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}
     saveSettings(cfg_);
     return (int)msg.wParam;
 }
+bool Overlay::reconnect(){
+    const auto now=GetTickCount64();
+    if(lastReconnectAttempt_ && now-lastReconnectAttempt_<3000)return false;
+    lastReconnectAttempt_=now;
+    proc_.detach();
+    ue_.clearCaches();
+    scanner_.reset();
+    rows_.clear();
+    game_=nullptr;
+    gameRect_={};
+    connected_=false;
+    try {
+        proc_.attach();  // Includes SHA256 verification before read-only OpenProcess.
+        game_=gameWindow(proc_.pid());
+        if(!game_)throw std::runtime_error("Game window not found");
+        connected_=true;
+        ++reconnectCount_;
+        lastScan_=0;
+        lastChainCheck_=0;
+        scanRequested_=true;
+        geometry();
+        status_=L"Connected to game PID "+std::to_wstring(proc_.pid());
+        OutputDebugStringW((L"Abiotic ESP: "+status_+L"\n").c_str());
+        return true;
+    } catch(const std::exception& e){
+        const std::string what=e.what();
+        OutputDebugStringA(("Abiotic ESP: reconnect waiting: "+what+"\n").c_str());
+        proc_.detach();
+        game_=nullptr;
+        status_=L"Waiting for game (check SHA256 and window)";
+        return false;
+    }
+}
+
 bool Overlay::initialize(){
     // Geometry uses physical pixels to match the game client coordinates.
     SetProcessDPIAware();
@@ -100,6 +125,7 @@ LRESULT CALLBACK Overlay::wndproc(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp){
     return DefWindowProcW(hwnd,msg,wp,lp);
 }
 void Overlay::geometry(){
+    if(!game_||!IsWindow(game_))return;
     RECT client{};POINT p{0,0};
     if(!GetClientRect(game_,&client)||!ClientToScreen(game_,&p))return;
     RECT r{p.x,p.y,p.x+client.right,p.y+client.bottom};
@@ -137,23 +163,52 @@ void Overlay::hotkeys(){
     if(edge(VK_F10))showPanel();
 }
 void Overlay::tick(){
-    if(!IsWindow(game_)||!proc_.alive()){DestroyWindow(overlay_);return;}
-    hotkeys();geometry();
+    hotkeys();
+    if(!IsWindow(overlay_))return;
     const ULONGLONG now=GetTickCount64();
+    if(connected_&&(!proc_.alive()||!IsWindow(game_))){
+        connected_=false;game_=nullptr;gameRect_={};
+        scanner_.reset();ue_.clearCaches();rows_.clear();
+        proc_.detach();scanRequested_=false;
+        status_=L"Game closed; waiting to reconnect";
+    }
+    if(!connected_){
+        reconnect();
+        InvalidateRect(overlay_,nullptr,FALSE);
+        if(!connected_)return;
+    }
+    geometry();
     if(now-lastChainCheck_>=3000){
         lastChainCheck_=now;
         if(scanner_.identityChanged()){scanRequested_=true;rows_.clear();}
     }
     if(scanRequested_||now-lastScan_>=(ULONGLONG)cfg_.scanIntervalSeconds*1000){
         std::string err;
-        if(scanner_.refresh(err)){
-            lastScan_=now;scanRequested_=false;
+        const ULONGLONG t0=GetTickCount64();
+        const bool success=scanner_.refresh(err);
+        scanLastMs_=static_cast<double>(GetTickCount64()-t0);
+        ++scanCount_;
+        scanAvgMs_+=(scanLastMs_-scanAvgMs_)/static_cast<double>(scanCount_);
+        lastScan_=now;scanRequested_=false;
+        if(success){
             status_=L"Actors: "+std::to_wstring(scanner_.data().actors.size())+L" | scan OK";
         }else{
-            lastScan_=now;scanRequested_=false;
+            ++scanErrors_;
             status_=L"Streaming / retry on next scan";
             OutputDebugStringA(("Abiotic ESP scan: "+err+"\n").c_str());
         }
+    }
+    if(now-lastStats_>=5000){
+        lastStats_=now;
+        readErrors_=proc_.readFailures();
+        std::wostringstream metrics;
+        metrics<<L"AbioticESP [PID "<<proc_.pid()<<L"] actors="<<scanner_.data().actors.size()
+               <<L" scans="<<scanCount_<<L" scan_last_ms="<<scanLastMs_
+               <<L" scan_avg_ms="<<std::fixed<<std::setprecision(1)<<scanAvgMs_
+               <<L" scan_errors="<<scanErrors_<<L" read_errors="<<readErrors_
+               <<L" reconnects="<<reconnectCount_<<L"\n";
+        OutputDebugStringW(metrics.str().c_str());
+        if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
     }
     rows_.clear();
     const int w=gameRect_.right-gameRect_.left,h=gameRect_.bottom-gameRect_.top;
@@ -289,7 +344,9 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F3/F4/F5: loot    F6: HP    F7: dead",0,18,168,310,22);
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit.  No injection or writes.",0,18,222,310,22);
-        add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);break;
+        add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
+        add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
+        add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
     add(L"BUTTON",L"Save settings",900,18,344,147,32,BS_PUSHBUTTON);
     add(L"BUTTON",L"Close",901,172,344,147,32,BS_PUSHBUTTON);

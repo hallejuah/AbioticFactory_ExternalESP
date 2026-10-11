@@ -1,0 +1,16 @@
+# Generated CMake and Visual Studio files
+build/
+build_*/
+out/
+.vs/
+CMakeFiles/
+CMakeCache.txt
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.user
+*.log
+
+# User-specific runtime settings
+abiotic_cpp_settings.ini
