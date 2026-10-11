@@ -1,6 +1,7 @@
 #pragma once
 #include "scanner.hpp"
 #include "settings.hpp"
+#include "bone_points.hpp"
 namespace abiotic {
 class Overlay {
 public:
@@ -19,6 +20,7 @@ private:
     void toggleCategory(Category category);
     bool focused()const;
     void drawRow(HDC, const Row&);
+    void drawBoneDebug(HDC);
     void probeNearestEnemy();
     void probeNearestOutline();
     void probeNearestReflection();
@@ -36,6 +38,8 @@ private:
     std::vector<HWND> controls_;
     Process proc_;UE5 ue_;Scanner scanner_;Config cfg_;
     RECT gameRect_{};std::vector<Row> rows_;
+    std::vector<BoneDebugPoint> boneDebugPoints_;
+    ULONGLONG lastBoneSample_{};
     unsigned long long tickCount_{};
     ULONGLONG lastScan_{},lastChainCheck_{},lastLevelCheck_{},lastReconnectAttempt_{},lastStats_{};
     ULONGLONG scanCount_{},scanErrors_{},reconnectCount_{},readErrors_{};
