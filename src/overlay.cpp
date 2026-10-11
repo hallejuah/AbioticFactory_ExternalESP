@@ -168,7 +168,7 @@ void Overlay::hotkeys(){
     if(edge(VK_F8))cfg_.active=!cfg_.active;
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
-    if(edge('B')){cfg_.skeletonDebug=!cfg_.skeletonDebug;boneDebugPoints_.clear();lastBoneSample_=0;}
+    if(edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;}
     if(edge(VK_F11))probeNearestEnemy();
     if(edge(VK_F12))probeNearestBones(); // F12: v1.1 bone diagnostic
 }
@@ -389,7 +389,7 @@ void Overlay::tick(){
         return x==y?a.screen.distance<b.screen.distance:x<y;
     });
     if((int)rows_.size()>cfg_.maxLabels)rows_.resize(cfg_.maxLabels);
-    if(!cfg_.skeletonDebug)boneDebugPoints_.clear();
+    if(cfg_.skeletonMode==0)boneDebugPoints_.clear();
     else if(!lastBoneSample_||now-lastBoneSample_>=50){
         lastBoneSample_=now;
         boneDebugPoints_.clear();
@@ -412,9 +412,35 @@ void Overlay::paint(HDC dc){
     SetBkMode(dc,TRANSPARENT);
     if(!cfg_.active||!focused()&&cfg_.focusOnly)return;
     for(auto& row:rows_)drawRow(dc,row);
-    if(cfg_.skeletonDebug)drawBoneDebug(dc);
+    if(cfg_.skeletonMode>0)drawBoneDebug(dc);
 }
 void Overlay::drawBoneDebug(HDC dc){
+    // The links are guessed from the observed Pest screenshot. NOT UE bone parents.
+    if(cfg_.skeletonMode==2){
+        constexpr std::array<std::pair<int,int>,9> links{{{0,1},{1,2},{2,3},{3,4},
+            {4,5},{4,6},{5,7},{6,8},{2,9}}};
+        std::array<const BoneDebugPoint*,10> indexed{};
+        for(const auto& point:boneDebugPoints_)
+            if(point.index>=0 && point.index<10 && point.screen.visible)
+                indexed[static_cast<size_t>(point.index)]=&point;
+        HPEN pen=CreatePen(PS_SOLID,2,RGB(255,195,77));
+        HGDIOBJ previous=SelectObject(dc,pen);
+        for(const auto [from,to]:links){
+            const auto* a=indexed[static_cast<size_t>(from)];
+            const auto* b=indexed[static_cast<size_t>(to)];
+            if(!a || !b)continue;
+            const double dx=a->screen.x-b->screen.x;
+            const double dy=a->screen.y-b->screen.y;
+            // Prevent huge erroneous cross-screen lines while geometry is experimental.
+            if(dx*dx+dy*dy>400.0*400.0)continue;
+            MoveToEx(dc,static_cast<int>(std::lround(a->screen.x)),
+                static_cast<int>(std::lround(a->screen.y)),nullptr);
+            LineTo(dc,static_cast<int>(std::lround(b->screen.x)),
+                static_cast<int>(std::lround(b->screen.y)));
+        }
+        SelectObject(dc,previous);
+        DeleteObject(pen);
+    }
     auto oldPen=SelectObject(dc,GetStockObject(DC_PEN));
     SetDCPenColor(dc,RGB(102,255,245));
     auto oldBrush=SelectObject(dc,GetStockObject(NULL_BRUSH));
@@ -521,13 +547,15 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"Values apply immediately.",0,18,226,310,20);break;
       case 3:
         chk(L"Only when game/menu focused",10,cfg_.focusOnly,60);
-        chk(L"Skeleton debug (Pest only)",11,cfg_.skeletonDebug,88);
+        chk(L"Skeleton debug (Pest only)",11,cfg_.skeletonMode>0,88);
+        add(L"STATIC",cfg_.skeletonMode==2?L"Mode: points + lines":
+            cfg_.skeletonMode==1?L"Mode: points only":L"Mode: off",0,35,110,250,19);
         step(L"Scan interval",6,cfg_.scanIntervalSeconds,L"s",130);
         add(L"STATIC",L"F3/F4/F5: loot    F6: HP    F7: dead",0,18,168,310,22);
-        add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel    B: bones",0,18,195,310,22);
+        add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit.  No injection or writes.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"F11: mesh  F12: bone diagnostics",0,18,330,310,22);
+        add(L"STATIC",L"B: off/points/lines  F11/F12: probes",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
@@ -545,7 +573,7 @@ void Overlay::onCommand(WPARAM wp,LPARAM){
         case 6:cfg_.showHp=!cfg_.showHp;break;case 7:cfg_.showBars=!cfg_.showBars;break;
         case 8:cfg_.hideDead=!cfg_.hideDead;break;case 9:cfg_.showArmor=!cfg_.showArmor;break;
         case 10:cfg_.focusOnly=!cfg_.focusOnly;break;
-        case 11:cfg_.skeletonDebug=!cfg_.skeletonDebug;boneDebugPoints_.clear();lastBoneSample_=0;break;
+        case 11:cfg_.skeletonMode=cfg_.skeletonMode?0:1;boneDebugPoints_.clear();lastBoneSample_=0;break;
         }return;
     }
     if((id>=ID_DEC_BASE&&id<ID_DEC_BASE+7)||(id>=ID_INC_BASE&&id<ID_INC_BASE+7)){
