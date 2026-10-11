@@ -5,6 +5,7 @@
 #include "abiotic/property_chain.hpp"
 #include "abiotic/property_values.hpp"
 #include "abiotic/bone_probe.hpp"
+#include "abiotic/native_outline.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cwchar>
@@ -171,7 +172,7 @@ void Overlay::hotkeys(){
     if(edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;
         if(panelOpen_)updatePanel();}
     if(edge(VK_F11))probeNearestEnemy();
-    if(edge(VK_F12))probeNearestBones(); // F12: v1.1 bone diagnostic
+    if(edge(VK_F12))probeNearestNativeOutline(); // F12: v1.4 native outline diagnostics
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -295,6 +296,26 @@ void Overlay::probeNearestBones(){
     const bool saved=appendBoneProbe(result);
     OutputDebugStringA(result.text.c_str());
     status_=saved?L"Bone report saved: abiotic_bone_transforms.txt":L"Bone report write failed";
+    if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
+}
+void Overlay::probeNearestNativeOutline(){
+    if(!connected_ || rows_.empty())return;
+    const int width=gameRect_.right-gameRect_.left;
+    const int height=gameRect_.bottom-gameRect_.top;
+    const Row* chosen=nullptr;
+    double best=1.0e100;
+    for(const auto& row:rows_){
+        if(row.actor.category!=Category::Hostile)continue;
+        if(row.hasLife&&row.life.dead)continue;
+        const double dx=row.screen.x-width*0.5,dy=row.screen.y-height*0.5;
+        const double dist=dx*dx+dy*dy;
+        if(dist<best){best=dist;chosen=&row;}
+    }
+    if(!chosen)return;
+    const auto result=inspectNativeOutline(ue_,chosen->actor.address,chosen->actor.name);
+    const bool saved=appendNativeOutlineReport(result);
+    OutputDebugStringA(result.text.c_str());
+    status_=saved?L"Native outline report: abiotic_native_outline.txt":L"Native outline report write failed";
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
@@ -556,7 +577,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit.  No injection or writes.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"B: off/points/lines  F11/F12: probes",0,18,330,310,22);
+        add(L"STATIC",L"B: bones  F11: mesh  F12: native outline",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
