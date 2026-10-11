@@ -219,16 +219,30 @@ void Overlay::tick(){
        !snapshot.cameraManager||!ue_.readCamera(snapshot.cameraManager,cam)){
         InvalidateRect(overlay_,nullptr,FALSE);return;
     }
+    // Position/health samples are refreshed at 30 Hz, while the latest camera is
+    // sampled and reprojected at ~60 Hz to reduce camera-motion label stepping.
+    const bool sampleActors = !lastActorSample_ || now-lastActorSample_>=33;
+    if(sampleActors)lastActorSample_=now;
     for(const auto& actor:snapshot.actors){
         if(!cfg_.enabled(actor.category))continue;
-        Vec3 pos{};if(!ue_.actorPos(actor.address,pos))continue;
-        ScreenPoint pt=project(cam,pos,w,h);
+        auto& sample=actorSamples_[actor.address];
+        if(sampleActors || !sample.valid){
+            Vec3 pos{};
+            sample.valid=ue_.actorPos(actor.address,pos);
+            if(sample.valid){
+                sample.pos=pos;
+                if(actor.category==Category::Hostile)
+                    sample.life=ue_.life(actor.address,actor.name=="NPC_Robot_Security_C");
+            }
+        }
+        if(!sample.valid)continue;
+        ScreenPoint pt=project(cam,sample.pos,w,h);
         if(!pt.visible)continue;
         bool loot=actor.category==Category::Dropped||actor.category==Category::MicroLoot||actor.category==Category::ResourceNode;
         if(pt.distance>(loot?cfg_.lootDistance:cfg_.maxDistance))continue;
         Row row;row.actor=actor;row.screen=pt;
         if(actor.category==Category::Hostile){
-            row.life=ue_.life(actor.address,actor.name=="NPC_Robot_Security_C");row.hasLife=row.life.valid;
+            row.life=sample.life;row.hasLife=row.life.valid;
             if(cfg_.hideDead&&verifiedLife(actor.name)&&row.hasLife&&row.life.hp<=0.001&&row.life.dead)continue;
         }
         rows_.push_back(std::move(row));
