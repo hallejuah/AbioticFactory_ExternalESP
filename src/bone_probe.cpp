@@ -1,5 +1,6 @@
 #include "abiotic/bone_probe.hpp"
 #include "abiotic/settings.hpp"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
