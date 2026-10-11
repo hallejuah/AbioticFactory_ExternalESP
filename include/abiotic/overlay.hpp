@@ -19,6 +19,7 @@ private:
     void toggleCategory(Category category);
     bool focused()const;
     void drawRow(HDC, const Row&);
+    void probeNearestEnemy();
     struct ActorSample { Vec3 pos{}; Life life{}; bool valid{}; };
     std::unordered_map<Addr,ActorSample> actorSamples_;
     ULONGLONG lastActorSample_{};
