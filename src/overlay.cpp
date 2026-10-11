@@ -273,6 +273,27 @@ void Overlay::probeNearestPropertyValues(){
     status_=saved?L"Property report saved: abiotic_property_values.txt":L"Property report write failed";
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
+void Overlay::probeNearestBones(){
+    if(!connected_ || rows_.empty())return;
+    const int w=gameRect_.right-gameRect_.left;
+    const int h=gameRect_.bottom-gameRect_.top;
+    const Row* chosen=nullptr;
+    double best=1.0e100;
+    for(const auto& row:rows_){
+        if(row.actor.category!=Category::Hostile)continue;
+        if(row.hasLife && row.life.dead)continue;
+        const double dx=row.screen.x-w*0.5;
+        const double dy=row.screen.y-h*0.5;
+        const double score=dx*dx+dy*dy;
+        if(score<best){best=score;chosen=&row;}
+    }
+    if(!chosen)return;
+    const auto result=inspectBoneTransforms(ue_,chosen->actor.address,chosen->actor.name);
+    const bool saved=appendBoneProbe(result);
+    OutputDebugStringA(result.text.c_str());
+    status_=saved?L"Bone report saved: abiotic_bone_transforms.txt":L"Bone report write failed";
+    if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
+}
 void Overlay::tick(){
     hotkeys();
     if(!IsWindow(overlay_))return;
