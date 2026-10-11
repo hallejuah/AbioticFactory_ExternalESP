@@ -1,6 +1,7 @@
 #include "abiotic/overlay.hpp"
 #include "abiotic/mesh_probe.hpp"
 #include "abiotic/outline_probe.hpp"
+#include "abiotic/reflection_probe.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cwchar>
@@ -164,7 +165,7 @@ void Overlay::hotkeys(){
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
     if(edge(VK_F11))probeNearestEnemy();
-    if(edge(VK_F12))probeNearestOutline();
+    if(edge(VK_F12))probeNearestReflection(); // F12: latest inspector
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -207,6 +208,25 @@ void Overlay::probeNearestOutline(){
     const bool saved=appendOutlineProbe(result);
     OutputDebugStringA(result.report.c_str());
     status_=saved?L"Outline report saved: abiotic_outline_probe.txt":L"Cannot write outline report";
+    if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
+}
+void Overlay::probeNearestReflection(){
+    if(!connected_ || rows_.empty())return;
+    const int w=gameRect_.right-gameRect_.left, h=gameRect_.bottom-gameRect_.top;
+    const Row* chosen=nullptr;
+    double best=1.0e100;
+    for(const auto& row:rows_){
+        if(row.actor.category!=Category::Hostile)continue;
+        if(row.hasLife && row.life.dead)continue;
+        const double dx=row.screen.x-w*0.5,dy=row.screen.y-h*0.5;
+        const double score=dx*dx+dy*dy;
+        if(score<best){best=score;chosen=&row;}
+    }
+    if(!chosen)return;
+    const auto result=inspectReflection(ue_,chosen->actor.address,chosen->actor.name);
+    const bool saved=appendReflectionReport(result);
+    OutputDebugStringA(result.report.c_str());
+    status_=saved?L"Reflection report saved: abiotic_reflection_probe.txt":L"Reflection report write failed";
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
@@ -407,7 +427,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit.  No injection or writes.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"F11: mesh  F12: outline research",0,18,330,310,22);
+        add(L"STATIC",L"F11: mesh  F12: reflection inspector",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
