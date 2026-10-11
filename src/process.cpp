@@ -42,7 +42,7 @@ std::string hashFile(const std::filesystem::path& path) {
 }
 }
 Process::~Process(){detach();}
-void Process::detach(){if(handle_){CloseHandle(handle_);handle_=nullptr;}pid_=0;base_=0;exe_.clear();}
+void Process::detach(){if(handle_){CloseHandle(handle_);handle_=nullptr;}pid_=0;base_=0;exe_.clear();resetCounters();}
 void Process::attach(){
     detach();
     Handle processes(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0));
@@ -66,9 +66,13 @@ void Process::attach(){
     handle_=h;pid_=found;base_=foundBase;exe_=path;
 }
 bool Process::read(Addr address,void* output,size_t size) const {
-    if(!handle_||address<0x10000||address>=0x0000800000000000ULL||size==0||size>65536)return false;
+    if(!handle_||address<0x10000||address>=0x0000800000000000ULL||size==0||size>65536){
+        readFailures_.fetch_add(1,std::memory_order_relaxed);return false;
+    }
     SIZE_T got=0;
-    return ReadProcessMemory(handle_,reinterpret_cast<LPCVOID>(address),output,size,&got) && got==size;
+    const bool ok=ReadProcessMemory(handle_,reinterpret_cast<LPCVOID>(address),output,size,&got) && got==size;
+    if(!ok)readFailures_.fetch_add(1,std::memory_order_relaxed);
+    return ok;
 }
 bool Process::alive() const {DWORD exitCode=0;return handle_ && GetExitCodeProcess(handle_,&exitCode) && exitCode==STILL_ACTIVE;}
 }
