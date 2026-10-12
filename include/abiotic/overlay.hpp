@@ -5,6 +5,7 @@
 #include "customdepth_trial.hpp"
 #include "outline_survey.hpp"
 #include "weapon_research.hpp"
+#include "no_recoil_trial.hpp"
 namespace abiotic {
 class Overlay {
 public:
@@ -50,6 +51,9 @@ private:
     RECT gameRect_{};std::vector<Row> rows_;
     CustomDepthTrial customDepthTrial_{};
     WeaponSampleSession weaponSample_{};
+    NoRecoilTrial noRecoilTrial_{};
+    void stopRecoilTrial();
+    void probeRecoilTrial();
     OutlineSurveyState outlineSurveyState_{};
     std::vector<BoneDebugPoint> boneDebugPoints_;
     ULONGLONG lastBoneSample_{};

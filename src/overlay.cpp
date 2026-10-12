@@ -76,6 +76,7 @@ bool Overlay::reconnect(){
     const auto now=GetTickCount64();
     if(lastReconnectAttempt_ && now-lastReconnectAttempt_<3000)return false;
     lastReconnectAttempt_=now;
+    stopRecoilTrial();
     cancelWeaponSampling(weaponSample_);
     proc_.detach();
     ue_.clearCaches();
@@ -134,9 +135,9 @@ LRESULT CALLBACK Overlay::wndproc(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp){
         case WM_COMMAND:self->onCommand(wp,lp);return 0;
         case WM_HSCROLL:self->onScroll(wp,lp);return 0;
         case WM_CLOSE:if(hwnd==self->panel_){self->showPanel();return 0;}
-            if(hwnd==self->overlay_){self->restoreTrial();if(self->customDepthTrial_.active)return 0;}
+            if(hwnd==self->overlay_){self->stopRecoilTrial();self->restoreTrial();if(self->customDepthTrial_.active)return 0;}
             DestroyWindow(hwnd);return 0;
-        case WM_DESTROY:if(hwnd==self->overlay_){self->restoreTrial();PostQuitMessage(0);}return 0;
+        case WM_DESTROY:if(hwnd==self->overlay_){self->stopRecoilTrial();self->restoreTrial();PostQuitMessage(0);}return 0;
     }
     return DefWindowProcW(hwnd,msg,wp,lp);
 }
@@ -168,7 +169,8 @@ void Overlay::toggleCategory(Category cat){
 }
 void Overlay::hotkeys(){
     auto edge=[&](int k){bool down=(GetAsyncKeyState(k)&0x8000)!=0;bool pressed=down&&!held_[k];held_[k]=down;return pressed;};
-    if(edge(VK_END)){restoreTrial();if(customDepthTrial_.active)return;DestroyWindow(overlay_);return;}
+    if(edge(VK_END)){stopRecoilTrial();restoreTrial();if(customDepthTrial_.active)return;DestroyWindow(overlay_);return;}
+    if(edge(VK_F1))probeRecoilTrial();
     if(edge(VK_F3))toggleCategory(Category::ResourceNode);
     if(edge(VK_F4))toggleCategory(Category::MicroLoot);
     if(edge(VK_F5))toggleCategory(Category::Dropped);
@@ -180,6 +182,25 @@ void Overlay::hotkeys(){
     if(edge(VK_F11))probeNeedleRifle(); // read-only needle rifle research
     // v1.7: disable active memory trials while researching render pipeline.
     // F12 outline research disabled in clean Box ESP.
+}
+void Overlay::probeRecoilTrial(){
+    std::string reason;
+    if(noRecoilTrial_.active){
+        stopNoRecoilTrial(noRecoilTrial_,reason);
+        status_=L"NoRecoil trial stopped";
+    }else if(connected_){
+        const bool ok=startNoRecoilTrial(ue_,proc_,noRecoilTrial_,
+                                        GetTickCount64(),reason);
+        status_=ok?L"NoRecoil trial active (1.5s)":
+                   L"NoRecoil unavailable: check rifle and idle state";
+    }
+    OutputDebugStringA(("NoRecoil: "+reason+"\n").c_str());
+}
+void Overlay::stopRecoilTrial(){
+    if(!noRecoilTrial_.active)return;
+    std::string reason;
+    stopNoRecoilTrial(noRecoilTrial_,reason);
+    OutputDebugStringA(("NoRecoil: "+reason+"\n").c_str());
 }
 void Overlay::probeNeedleRifle(){
     if(!connected_||weaponSample_.active)return;
@@ -419,6 +440,13 @@ void Overlay::probeOutlineSurvey(){
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
+    if(noRecoilTrial_.active){
+        std::string note;
+        if(tickNoRecoilTrial(ue_,proc_,noRecoilTrial_,GetTickCount64(),note)){
+            OutputDebugStringA(("NoRecoil: "+note+"\n").c_str());
+            status_=L"NoRecoil trial ended";
+        }
+    }
     if(weaponSample_.active){
         std::string summary;
         if(stepWeaponSampling(ue_,weaponSample_,GetTickCount64(),summary)){
@@ -436,6 +464,7 @@ void Overlay::tick(){
         restoreTrial();
         // Never detach a live process while its restoration remains pending.
         if(customDepthTrial_.active)return;
+        stopRecoilTrial();
         cancelWeaponSampling(weaponSample_);
         connected_=false;game_=nullptr;gameRect_={};
         scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
