@@ -12,6 +12,7 @@
 #include <cwchar>
 #include <sstream>
 #include <iomanip>
+#include <fstream>
 #include <string>
 #include <cstring>
 #include <CommCtrl.h>
@@ -358,7 +359,10 @@ void Overlay::runCustomDepthTrial(){
     std::string note;
     const bool started=startCustomDepthTrial(ue_,proc_,chosen->actor.address,customDepthTrial_,note);
     OutputDebugStringA(("CustomDepth trial: "+note+"\n").c_str());
-    status_=started?L"CustomDepth trial ON (5 sec)":L"CustomDepth trial refused; see debugger";
+    {std::ofstream out(settingsPath().parent_path()/L"abiotic_customdepth_test.txt",std::ios::app);
+     out<<"tick="<<GetTickCount64()<<" start="<<(started?"yes":"no")<<" "<<note<<"\n";}
+    status_=started?L"CustomDepth trial ON (5 sec)":customDepthTrial_.active?
+        L"CustomDepth recovery pending; do not exit":L"CustomDepth trial refused; see log";
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::restoreTrial(){
@@ -366,8 +370,10 @@ void Overlay::restoreTrial(){
     std::string note;
     const bool restored=restoreCustomDepthTrial(ue_,proc_,customDepthTrial_,note);
     OutputDebugStringA(("CustomDepth restore: "+note+"\n").c_str());
+    {std::ofstream out(settingsPath().parent_path()/L"abiotic_customdepth_test.txt",std::ios::app);
+     out<<"tick="<<GetTickCount64()<<" restored="<<(restored?"yes":"no")<<" "<<note<<"\n";}
     if(restored)status_=L"CustomDepth original bit restored";
-    else status_=L"CustomDepth restore pending/failed; see debugger";
+    else status_=L"CustomDepth restore pending/failed; see log";
 }
 void Overlay::tick(){
     if(customDepthTrial_.active && GetTickCount64()>=customDepthTrial_.deadline)restoreTrial();
