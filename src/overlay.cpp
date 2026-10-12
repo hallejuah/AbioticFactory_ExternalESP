@@ -135,7 +135,7 @@ LRESULT CALLBACK Overlay::wndproc(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp){
         case WM_COMMAND:self->onCommand(wp,lp);return 0;
         case WM_HSCROLL:self->onScroll(wp,lp);return 0;
         case WM_CLOSE:if(hwnd==self->panel_){self->showPanel();return 0;}
-            if(hwnd==self->overlay_){self->restoreTrial();if(self->customDepthTrial_.active)return 0;}
+            if(hwnd==self->overlay_){self->stopRecoilTrial();self->restoreTrial();if(self->customDepthTrial_.active)return 0;}
             DestroyWindow(hwnd);return 0;
         case WM_DESTROY:if(hwnd==self->overlay_){self->restoreTrial();PostQuitMessage(0);}return 0;
     }
