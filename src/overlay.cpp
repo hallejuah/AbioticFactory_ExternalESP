@@ -690,7 +690,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit. No game memory writes in v1.7.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"Box ESP: F11 weapon research (read-only)",0,18,330,310,22);
+        add(L"STATIC",L"F11: equipped weapon research (read-only)",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
