@@ -175,8 +175,6 @@ void Overlay::hotkeys(){
     if(edge(VK_F8))cfg_.active=!cfg_.active;
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
-    if(false && edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;
-        if(panelOpen_)updatePanel();}
     // F11 research probe disabled in clean Box ESP.
     // v1.7: disable active memory trials while researching render pipeline.
     // F12 outline research disabled in clean Box ESP.
@@ -485,7 +483,8 @@ void Overlay::tick(){
             sample.valid=ue_.actorPos(actor.address,pos);
             if(sample.valid){
                 sample.pos=pos;
-                if(actor.category==Category::Hostile)
+                sample.life=Life{};
+                if(actor.category==Category::Hostile&&verifiedLife(actor.name))
                     sample.life=ue_.life(actor.address,actor.name=="NPC_Robot_Security_C");
             }
         }
@@ -520,7 +519,7 @@ void Overlay::tick(){
     });
     if((int)rows_.size()>cfg_.maxLabels)rows_.resize(cfg_.maxLabels);
     cfg_.skeletonMode=0;
-    if(cfg_.skeletonMode==0)boneDebugPoints_.clear();
+    boneDebugPoints_.clear();
     else if(!lastBoneSample_||now-lastBoneSample_>=50){
         lastBoneSample_=now;
         boneDebugPoints_.clear();
