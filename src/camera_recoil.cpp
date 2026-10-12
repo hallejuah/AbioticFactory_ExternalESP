@@ -68,7 +68,7 @@ bool stepCameraRecoilCapture(UE5& ue,const Process& process,CameraRecoilSession&
         return true;
     }
     Camera cam{};
-    if(!ue.readCamera(s.cameraManager,cam)){
+    if(!ue.saneObject(s.cameraManager)||!ue.readCamera(s.cameraManager,cam)){
         s.active=false;result="capture stopped: camera unavailable";
         return true;
     }
