@@ -1,6 +1,8 @@
 #include "abiotic/weapon_research.hpp"
 #include "abiotic/settings.hpp"
 #include <array>
+#include <cmath>
+#include <limits>
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
@@ -90,6 +92,51 @@ void directObjects(UE5& ue,std::ostringstream& out,Addr owner,const char* label)
     }
     out<<"  sampledPointers="<<examined<<" matches="<<hits<<"\n";
 }
+// Candidate offsets observed through FProperty metadata in the tested build.
+// Only finite, plausibly bounded read-only values are reported.
+void liveValues(UE5& ue,std::ostringstream& out,Addr character){
+    struct Number {const char* name; Addr offset;};
+    constexpr std::array<Number,5> numbers{{
+      {"LastTimeFiredWeapon",0x1898},
+      {"BulletSpread_Base",0x19C0},
+      {"BaseGunSway_Multiplier",0x19D8},
+      {"CurrentGunSway_Speed",0x19E0},
+      {"AimRecoilAdditive",0x1A00}
+    }};
+    out<<"PlayerCharacter numeric candidate snapshots (double):\n";
+    for(const auto& p:numbers){
+        const auto value=ue.memory().get<double>(character+p.offset);
+        out<<"  "<<p.name<<" @+0x"<<std::hex<<p.offset<<std::dec<<" = ";
+        if(value&&std::isfinite(*value)&&std::abs(*value)<1.0e12)
+            out<<std::setprecision(12)<<*value;
+        else out<<"INVALID/UNAVAILABLE";
+        out<<"\n";
+    }
+    const auto burst=ue.memory().get<std::int32_t>(character+0x2878);
+    out<<"  CurrentWeaponBurstCounter @+0x2878 = ";
+    if(burst&&*burst>=0&&*burst<=100000)out<<*burst;
+    else out<<"INVALID/UNAVAILABLE";
+    out<<"\n";
+    // FireDelayTimer is a StructProperty: interpreting its bytes as a
+    // scalar interval would be wrong without UScriptStruct layout research.
+    out<<"  FireDelayTimer @+0x2590 is a STRUCT; NOT decoded as fire rate\n";
+}
+void weaponSnapshot(UE5& ue,std::ostringstream& out,Addr character){
+    const Addr item=ue.memory().pointer(character+0x1A50);
+    if(!ue.saneObject(item)){
+        out<<"ItemInHand_BP not a validated UObject; skipping weapon inspection\n";
+        return;
+    }
+    const auto cls=ue.className(ue.classOf(item));
+    out<<"ItemInHand_BP class="<<cls<<"\n";
+    if(cls!="Abiotic_Weapon_QuillRifle_C"){
+        out<<"Not holding QuillRifle; no rifle-specific reflected scan\n";
+        return;
+    }
+    out<<"QuillRifle class confirmed: reflected weapon parameters follow\n";
+    reflectedHints(ue,out,item,"QuillRifle");
+    directObjects(ue,out,item,"QuillRifle");
+}
 }
 std::filesystem::path needleRifleReportPath(){
     return settingsPath().parent_path()/L"abiotic_needle_rifle_research.txt";
@@ -97,7 +144,7 @@ std::filesystem::path needleRifleReportPath(){
 WeaponResearchResult inspectNeedleRifle(UE5& ue){
     WeaponResearchResult result{};
     std::ostringstream out;
-    out<<"Abiotic ESP v2.2 Needle Rifle EQUIPMENT research (READ ONLY)\n";
+    out<<"Abiotic ESP v2.3 Needle Rifle LIVE VALUES research (READ ONLY)\n";
     Addr world=0,camera=0;
     if(!ue.readChain(world,camera)||!ue.anchorCheck(world)){
         result.report="Weapon research: world/controller chain failed\n\n";
@@ -134,11 +181,13 @@ WeaponResearchResult inspectNeedleRifle(UE5& ue){
         out<<"PlayerCharacter class="<<ue.className(ue.classOf(character))<<"\n";
         reflectedHints(ue,out,character,"PlayerCharacter");
         directObjects(ue,out,character,"PlayerCharacter");
+        liveValues(ue,out,character);
+        weaponSnapshot(ue,out,character);
     }else{
         out<<"SKIP: character identity validation failed; no character scan\n";
     }
-    out<<"Next: compare snapshots with Needle Rifle and another held item.\n"
-       <<"The inspected values DO NOT yet identify the needle rifle conclusively.\n"
+    out<<"Next: compare F11 snapshots idle, after shots, and with another item.\n"
+       <<"Numeric readings and reflection names are CANDIDATES, not proven control fields.\n"
        <<"No rapid-fire/recoil patch, function invocation or memory write.\n\n";
     result.success=true;result.report=out.str();return result;
 }
