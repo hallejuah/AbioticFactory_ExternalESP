@@ -117,6 +117,16 @@ void liveValues(UE5& ue,std::ostringstream& out,Addr character){
     if(burst&&*burst>=0&&*burst<=100000)out<<*burst;
     else out<<"INVALID/UNAVAILABLE";
     out<<"\n";
+    // Animation timeline track values can decay quickly after a shot.
+    for(const auto& p:std::array<Number,2>{{{"ControllerRecoilTimeline_Track",0x17B0},
+                                               {"RecoilTimeline_Track",0x1800}}}){
+        const auto value=ue.memory().get<float>(character+p.offset);
+        out<<"  "<<p.name<<" @+0x"<<std::hex<<p.offset<<std::dec<<" = ";
+        if(value&&std::isfinite(*value)&&std::abs(*value)<1.0e6f)
+            out<<std::setprecision(9)<<*value;
+        else out<<"INVALID/UNAVAILABLE";
+        out<<"\n";
+    }
     // FireDelayTimer is a StructProperty: interpreting its bytes as a
     // scalar interval would be wrong without UScriptStruct layout research.
     out<<"  FireDelayTimer @+0x2590 is a STRUCT; NOT decoded as fire rate\n";
@@ -133,6 +143,14 @@ void weaponSnapshot(UE5& ue,std::ostringstream& out,Addr character){
         out<<"Not holding QuillRifle; no rifle-specific reflected scan\n";
         return;
     }
+    // FireDelayDuration was observed as a reflected DoubleProperty in v2.3.
+    // Capture its live value but do not assume writing it changes fire rate.
+    const auto delay=ue.memory().get<double>(item+0xB28);
+    out<<"QuillRifle.FireDelayDuration @+0xb28 = ";
+    if(delay&&std::isfinite(*delay)&&*delay>=0&&*delay<60.0)
+        out<<std::setprecision(12)<<*delay;
+    else out<<"INVALID/UNAVAILABLE";
+    out<<" [reflected DoubleProperty candidate; no writes]\n";
     out<<"QuillRifle class confirmed: reflected weapon parameters follow\n";
     reflectedHints(ue,out,item,"QuillRifle");
     directObjects(ue,out,item,"QuillRifle");
@@ -144,7 +162,7 @@ std::filesystem::path needleRifleReportPath(){
 WeaponResearchResult inspectNeedleRifle(UE5& ue){
     WeaponResearchResult result{};
     std::ostringstream out;
-    out<<"Abiotic ESP v2.3 Needle Rifle LIVE VALUES research (READ ONLY)\n";
+    out<<"Abiotic ESP v2.4 QuillRifle FIRE DELAY research (READ ONLY)\n";
     Addr world=0,camera=0;
     if(!ue.readChain(world,camera)||!ue.anchorCheck(world)){
         result.report="Weapon research: world/controller chain failed\n\n";
