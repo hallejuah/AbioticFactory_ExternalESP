@@ -8,6 +8,7 @@
 #include "abiotic/native_outline.hpp"
 #include "abiotic/bool_masks.hpp"
 #include "abiotic/render_pipeline.hpp"
+#include "abiotic/outline_survey.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cwchar>
@@ -178,7 +179,7 @@ void Overlay::hotkeys(){
         if(panelOpen_)updatePanel();}
     if(edge(VK_F11))probeNearestEnemy();
     // v1.7: disable active memory trials while researching render pipeline.
-    if(edge(VK_F12))probeNearestRenderPipeline(); // F12: v1.7 read-only render pipeline
+    if(edge(VK_F12))probeOutlineSurvey(); // F12: v1.8 sampled outline activation survey
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -397,6 +398,14 @@ void Overlay::probeNearestRenderPipeline(){
     const bool saved=appendRenderPipelineReport(report);
     OutputDebugStringA(report.text.c_str());
     status_=saved?L"Render pipeline report: abiotic_render_pipeline.txt":L"Render report write failed";
+    if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
+}
+void Overlay::probeOutlineSurvey(){
+    if(!connected_||scanner_.data().actors.empty())return;
+    const auto report=surveyOutlineActivation(ue_,scanner_.data().actors);
+    const bool saved=appendOutlineSurvey(report);
+    OutputDebugStringA(report.text.c_str());
+    status_=saved?L"Outline survey: abiotic_outline_survey.txt":L"Outline survey write failed";
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
@@ -662,7 +671,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit. No game memory writes in v1.7.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"F12: render pipeline report (F2 disabled)",0,18,330,310,22);
+        add(L"STATIC",L"F12: outline survey (F2 disabled)",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
