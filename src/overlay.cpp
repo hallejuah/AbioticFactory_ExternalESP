@@ -76,6 +76,7 @@ bool Overlay::reconnect(){
     const auto now=GetTickCount64();
     if(lastReconnectAttempt_ && now-lastReconnectAttempt_<3000)return false;
     lastReconnectAttempt_=now;
+    stopRecoilTrial();
     cancelWeaponSampling(weaponSample_);
     proc_.detach();
     ue_.clearCaches();
@@ -463,6 +464,7 @@ void Overlay::tick(){
         restoreTrial();
         // Never detach a live process while its restoration remains pending.
         if(customDepthTrial_.active)return;
+        stopRecoilTrial();
         cancelWeaponSampling(weaponSample_);
         connected_=false;game_=nullptr;gameRect_={};
         scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
