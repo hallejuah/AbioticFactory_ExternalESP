@@ -76,6 +76,7 @@ bool Overlay::reconnect(){
     const auto now=GetTickCount64();
     if(lastReconnectAttempt_ && now-lastReconnectAttempt_<3000)return false;
     lastReconnectAttempt_=now;
+    cancelWeaponSampling(weaponSample_);
     proc_.detach();
     ue_.clearCaches();
     scanner_.reset();
@@ -181,13 +182,12 @@ void Overlay::hotkeys(){
     // F12 outline research disabled in clean Box ESP.
 }
 void Overlay::probeNeedleRifle(){
-    if(!connected_)return;
-    const auto report=inspectNeedleRifle(ue_);
-    const bool saved=appendNeedleRifleReport(report);
-    OutputDebugStringA(report.report.c_str());
-    status_=saved?L"Needle rifle report: abiotic_needle_rifle_research.txt":
-        L"Needle rifle report write failed";
-    if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
+    if(!connected_||weaponSample_.active)return;
+    std::string reason;
+    const bool started=startWeaponSampling(ue_,weaponSample_,GetTickCount64(),reason);
+    OutputDebugStringA(("QuillRifle sampler: "+reason+"\n").c_str());
+    status_=started?L"QuillRifle F11: capturing for 2 seconds":
+        L"QuillRifle F11: equip rifle / check game connection";
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -419,6 +419,15 @@ void Overlay::probeOutlineSurvey(){
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
+    if(weaponSample_.active){
+        std::string summary;
+        if(stepWeaponSampling(ue_,weaponSample_,GetTickCount64(),summary)){
+            const bool saved=appendWeaponSamples(weaponSample_);
+            status_=saved?L"QuillRifle samples saved to CSV":
+                L"QuillRifle capture complete; CSV save failed";
+            OutputDebugStringA(("QuillRifle sampler: "+summary+"\n").c_str());
+        }
+    }
     if(customDepthTrial_.active && GetTickCount64()>=customDepthTrial_.deadline)restoreTrial();
     hotkeys();
     if(!IsWindow(overlay_))return;
@@ -427,6 +436,7 @@ void Overlay::tick(){
         restoreTrial();
         // Never detach a live process while its restoration remains pending.
         if(customDepthTrial_.active)return;
+        cancelWeaponSampling(weaponSample_);
         connected_=false;game_=nullptr;gameRect_={};
         scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
         outlineSurveyState_=OutlineSurveyState{};
@@ -690,7 +700,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit. No game memory writes in v1.7.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"F11: equipped weapon research (read-only)",0,18,330,310,22);
+        add(L"STATIC",L"F11: 2s QuillRifle samples (read-only)",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
