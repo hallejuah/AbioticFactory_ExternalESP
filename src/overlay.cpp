@@ -453,15 +453,15 @@ void Overlay::tick(){
         std::string note;
         if(tickNoRecoilTrial(ue_,proc_,noRecoilTrial_,GetTickCount64(),note)){
             OutputDebugStringA(("NoRecoil: "+note+"\n").c_str());
-            status_=L"NoRecoil trial ended";
+            showHotkeyStatus(L"Numpad1: NoRecoil trial ended",note);
         }
     }
     if(weaponSample_.active){
         std::string summary;
         if(stepWeaponSampling(ue_,weaponSample_,GetTickCount64(),summary)){
             const bool saved=appendWeaponSamples(weaponSample_);
-            status_=saved?L"QuillRifle samples saved to CSV":
-                L"QuillRifle capture complete; CSV save failed";
+            showHotkeyStatus(saved?L"Numpad2: CSV saved":
+                L"Numpad2: CSV save failed",summary);
             OutputDebugStringA(("QuillRifle sampler: "+summary+"\n").c_str());
         }
     }
