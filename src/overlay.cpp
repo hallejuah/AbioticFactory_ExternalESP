@@ -439,6 +439,13 @@ void Overlay::probeOutlineSurvey(){
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
+    if(noRecoilTrial_.active){
+        std::string note;
+        if(tickNoRecoilTrial(ue_,proc_,noRecoilTrial_,GetTickCount64(),note)){
+            OutputDebugStringA(("NoRecoil: "+note+"\n").c_str());
+            status_=L"NoRecoil trial ended";
+        }
+    }
     if(weaponSample_.active){
         std::string summary;
         if(stepWeaponSampling(ue_,weaponSample_,GetTickCount64(),summary)){
