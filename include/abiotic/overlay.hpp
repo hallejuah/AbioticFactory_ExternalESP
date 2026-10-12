@@ -3,6 +3,7 @@
 #include "settings.hpp"
 #include "bone_points.hpp"
 #include "customdepth_trial.hpp"
+#include "outline_survey.hpp"
 namespace abiotic {
 class Overlay {
 public:
@@ -46,6 +47,7 @@ private:
     Process proc_;UE5 ue_;Scanner scanner_;Config cfg_;
     RECT gameRect_{};std::vector<Row> rows_;
     CustomDepthTrial customDepthTrial_{};
+    OutlineSurveyState outlineSurveyState_{};
     std::vector<BoneDebugPoint> boneDebugPoints_;
     ULONGLONG lastBoneSample_{};
     unsigned long long tickCount_{};
