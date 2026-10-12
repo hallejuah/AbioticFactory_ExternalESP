@@ -384,6 +384,8 @@ void Overlay::tick(){
     const ULONGLONG now=GetTickCount64();
     if(connected_&&(!proc_.alive()||!IsWindow(game_))){
         restoreTrial();
+        // Never detach a live process while its restoration remains pending.
+        if(customDepthTrial_.active)return;
         connected_=false;game_=nullptr;gameRect_={};
         scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
         boneDebugPoints_.clear();lastBoneSample_=0;
