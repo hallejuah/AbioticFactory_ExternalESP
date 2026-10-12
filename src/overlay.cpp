@@ -169,7 +169,7 @@ void Overlay::toggleCategory(Category cat){
 }
 void Overlay::hotkeys(){
     auto edge=[&](int k){bool down=(GetAsyncKeyState(k)&0x8000)!=0;bool pressed=down&&!held_[k];held_[k]=down;return pressed;};
-    if(edge(VK_END)){restoreTrial();if(customDepthTrial_.active)return;DestroyWindow(overlay_);return;}
+    if(edge(VK_END)){stopRecoilTrial();restoreTrial();if(customDepthTrial_.active)return;DestroyWindow(overlay_);return;}
     if(edge(VK_F1))probeRecoilTrial();
     if(edge(VK_F3))toggleCategory(Category::ResourceNode);
     if(edge(VK_F4))toggleCategory(Category::MicroLoot);
