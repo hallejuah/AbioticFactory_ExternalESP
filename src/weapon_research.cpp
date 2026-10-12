@@ -12,7 +12,7 @@ namespace abiotic {
 namespace {
 constexpr Addr Outer=0x20,ChildProperties=0x50,Super=0x40;
 constexpr Addr Next=0x18,Name=0x20,FieldClass=0x08,Offset=0x44;
-constexpr unsigned MaxClasses=8,MaxFields=384,MaxCandidates=96;
+constexpr unsigned MaxClasses=8,MaxFields=384,MaxCandidates=240;
 bool weaponTerm(const std::string& value){
     const std::string_view s(value);
     for(const auto word:{"Weapon","weapon","Gun","gun","Needle","needle",
