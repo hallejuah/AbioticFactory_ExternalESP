@@ -129,7 +129,7 @@ LRESULT CALLBACK Overlay::wndproc(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp){
         case WM_COMMAND:self->onCommand(wp,lp);return 0;
         case WM_HSCROLL:self->onScroll(wp,lp);return 0;
         case WM_CLOSE:if(hwnd==self->panel_){self->showPanel();return 0;}DestroyWindow(hwnd);return 0;
-        case WM_DESTROY:if(hwnd==self->overlay_)PostQuitMessage(0);return 0;
+        case WM_DESTROY:if(hwnd==self->overlay_){self->restoreTrial();PostQuitMessage(0);}return 0;
     }
     return DefWindowProcW(hwnd,msg,wp,lp);
 }
@@ -161,7 +161,7 @@ void Overlay::toggleCategory(Category cat){
 }
 void Overlay::hotkeys(){
     auto edge=[&](int k){bool down=(GetAsyncKeyState(k)&0x8000)!=0;bool pressed=down&&!held_[k];held_[k]=down;return pressed;};
-    if(edge(VK_END)){DestroyWindow(overlay_);return;}
+    if(edge(VK_END)){restoreTrial();if(customDepthTrial_.active)return;DestroyWindow(overlay_);return;}
     if(edge(VK_F3))toggleCategory(Category::ResourceNode);
     if(edge(VK_F4))toggleCategory(Category::MicroLoot);
     if(edge(VK_F5))toggleCategory(Category::Dropped);
@@ -173,6 +173,7 @@ void Overlay::hotkeys(){
     if(edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;
         if(panelOpen_)updatePanel();}
     if(edge(VK_F11))probeNearestEnemy();
+    if(edge(VK_F2))runCustomDepthTrial();
     if(edge(VK_F12))probeNearestBoolMasks(); // F12: v1.5 bool metadata probe
 }
 void Overlay::probeNearestEnemy(){
@@ -340,11 +341,41 @@ void Overlay::probeNearestBoolMasks(){
     status_=saved?L"Bool report saved: abiotic_bool_masks.txt":L"Bool report write failed";
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
+void Overlay::runCustomDepthTrial(){
+    if(!connected_ || customDepthTrial_.active)return;
+    if(rows_.empty())return;
+    const int w=gameRect_.right-gameRect_.left;
+    const int h=gameRect_.bottom-gameRect_.top;
+    const Row* chosen=nullptr;
+    double best=1.0e100;
+    for(const auto& row:rows_){
+        if(row.actor.name!="NPC_Monster_Pest_C" || (row.hasLife&&row.life.dead))continue;
+        const double dx=row.screen.x-w*0.5,dy=row.screen.y-h*0.5;
+        const double score=dx*dx+dy*dy;
+        if(score<best){best=score;chosen=&row;}
+    }
+    if(!chosen)return;
+    std::string note;
+    const bool started=startCustomDepthTrial(ue_,proc_,chosen->actor.address,customDepthTrial_,note);
+    OutputDebugStringA(("CustomDepth trial: "+note+"\n").c_str());
+    status_=started?L"CustomDepth trial ON (5 sec)":L"CustomDepth trial refused; see debugger";
+    if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
+}
+void Overlay::restoreTrial(){
+    if(!customDepthTrial_.active)return;
+    std::string note;
+    const bool restored=restoreCustomDepthTrial(ue_,proc_,customDepthTrial_,note);
+    OutputDebugStringA(("CustomDepth restore: "+note+"\n").c_str());
+    if(restored)status_=L"CustomDepth original bit restored";
+    else status_=L"CustomDepth restore pending/failed; see debugger";
+}
 void Overlay::tick(){
+    if(customDepthTrial_.active && GetTickCount64()>=customDepthTrial_.deadline)restoreTrial();
     hotkeys();
     if(!IsWindow(overlay_))return;
     const ULONGLONG now=GetTickCount64();
     if(connected_&&(!proc_.alive()||!IsWindow(game_))){
+        restoreTrial();
         connected_=false;game_=nullptr;gameRect_={};
         scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
         boneDebugPoints_.clear();lastBoneSample_=0;
@@ -597,9 +628,9 @@ void Overlay::updatePanel(){
         step(L"Scan interval",6,cfg_.scanIntervalSeconds,L"s",130);
         add(L"STATIC",L"F3/F4/F5: loot    F6: HP    F7: dead",0,18,168,310,22);
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
-        add(L"STATIC",L"End: exit.  No injection or writes.",0,18,222,310,22);
+        add(L"STATIC",L"End: exit. F2 writes one bit; rest read-only.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"B: bones  F11: mesh  F12: bool masks",0,18,330,310,22);
+        add(L"STATIC",L"F2: CustomDepth 5s   F12: bool masks",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
