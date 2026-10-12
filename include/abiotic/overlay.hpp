@@ -54,6 +54,9 @@ private:
     NoRecoilTrial noRecoilTrial_{};
     void stopRecoilTrial();
     void probeRecoilTrial();
+    void showHotkeyStatus(const std::wstring&, const std::string&);
+    ULONGLONG hotkeyStatusUntil_{};
+    std::wstring hotkeyStatus_;
     OutlineSurveyState outlineSurveyState_{};
     std::vector<BoneDebugPoint> boneDebugPoints_;
     ULONGLONG lastBoneSample_{};
