@@ -170,7 +170,9 @@ void Overlay::toggleCategory(Category cat){
 void Overlay::hotkeys(){
     auto edge=[&](int k){bool down=(GetAsyncKeyState(k)&0x8000)!=0;bool pressed=down&&!held_[k];held_[k]=down;return pressed;};
     if(edge(VK_END)){stopRecoilTrial();restoreTrial();if(customDepthTrial_.active)return;DestroyWindow(overlay_);return;}
-    if(edge(VK_F1))probeRecoilTrial();
+    if(edge(VK_NUMPAD1))probeRecoilTrial();
+    if(edge(VK_NUMPAD2))probeNeedleRifle();
+    if(edge(VK_NUMPAD0))showHotkeyStatus(L"Numpad1: NoRecoil | Numpad2: samples | Numpad0: help", "Numpad help");
     if(edge(VK_F3))toggleCategory(Category::ResourceNode);
     if(edge(VK_F4))toggleCategory(Category::MicroLoot);
     if(edge(VK_F5))toggleCategory(Category::Dropped);
@@ -179,9 +181,17 @@ void Overlay::hotkeys(){
     if(edge(VK_F8))cfg_.active=!cfg_.active;
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
-    if(edge(VK_F11))probeNeedleRifle(); // read-only needle rifle research
+    // Weapon research moved from F11 to Numpad2.
     // v1.7: disable active memory trials while researching render pipeline.
     // F12 outline research disabled in clean Box ESP.
+}
+void Overlay::showHotkeyStatus(const std::wstring& message,const std::string& log){
+    hotkeyStatus_=message;
+    hotkeyStatusUntil_=GetTickCount64()+5000;
+    status_=message;
+    OutputDebugStringA(("Numpad ESP: "+log+"\n").c_str());
+    if(panel_&&panelOpen_)
+        SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::probeRecoilTrial(){
     std::string reason;
@@ -194,7 +204,7 @@ void Overlay::probeRecoilTrial(){
         status_=ok?L"NoRecoil trial active (1.5s)":
                    L"NoRecoil unavailable: check rifle and idle state";
     }
-    OutputDebugStringA(("NoRecoil: "+reason+"\n").c_str());
+    showHotkeyStatus(status_+(reason.empty()?L"":L" | "+std::wstring(reason.begin(),reason.end())),reason);
 }
 void Overlay::stopRecoilTrial(){
     if(!noRecoilTrial_.active)return;
@@ -206,9 +216,8 @@ void Overlay::probeNeedleRifle(){
     if(!connected_||weaponSample_.active)return;
     std::string reason;
     const bool started=startWeaponSampling(ue_,weaponSample_,GetTickCount64(),reason);
-    OutputDebugStringA(("QuillRifle sampler: "+reason+"\n").c_str());
-    status_=started?L"QuillRifle F11: capturing for 2 seconds":
-        L"QuillRifle F11: equip rifle / check game connection";
+    showHotkeyStatus(started?L"Numpad2: recording 2 seconds":
+        (L"Numpad2: "+std::wstring(reason.begin(),reason.end())),reason);
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -444,15 +453,15 @@ void Overlay::tick(){
         std::string note;
         if(tickNoRecoilTrial(ue_,proc_,noRecoilTrial_,GetTickCount64(),note)){
             OutputDebugStringA(("NoRecoil: "+note+"\n").c_str());
-            status_=L"NoRecoil trial ended";
+            showHotkeyStatus(L"Numpad1: NoRecoil trial ended",note);
         }
     }
     if(weaponSample_.active){
         std::string summary;
         if(stepWeaponSampling(ue_,weaponSample_,GetTickCount64(),summary)){
             const bool saved=appendWeaponSamples(weaponSample_);
-            status_=saved?L"QuillRifle samples saved to CSV":
-                L"QuillRifle capture complete; CSV save failed";
+            showHotkeyStatus(saved?L"Numpad2: CSV saved":
+                L"Numpad2: CSV save failed",summary);
             OutputDebugStringA(("QuillRifle sampler: "+summary+"\n").c_str());
         }
     }
@@ -575,6 +584,10 @@ void Overlay::paint(HDC dc){
     RECT r{};GetClientRect(overlay_,&r);
     HBRUSH transparent=CreateSolidBrush(Transparent);FillRect(dc,&r,transparent);DeleteObject(transparent);
     SetBkMode(dc,TRANSPARENT);
+    if(hotkeyStatusUntil_>GetTickCount64() && !hotkeyStatus_.empty()){
+        SetTextColor(dc,RGB(255,230,105));
+        TextOutW(dc,24,36,hotkeyStatus_.c_str(),static_cast<int>(hotkeyStatus_.size()));
+    }
     if(!cfg_.active||!focused()&&cfg_.focusOnly)return;
     for(auto& row:rows_)drawRow(dc,row);
     // Skeleton display disabled in v2.0 clean box mode.
