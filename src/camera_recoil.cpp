@@ -50,6 +50,53 @@ bool startCameraRecoilCapture(UE5& ue,const Process& process,CameraRecoilSession
     reason="capture started (2s)";
     return true;
 }
+bool stepCameraRecoilCapture(UE5& ue,const Process& process,CameraRecoilSession& s,
+                             std::uint64_t now,unsigned writes,std::string& result){
+    if(!s.active||now<s.nextMs)return false;
+    if(now-s.startMs>=2000||s.samples>=100){
+        s.active=false;
+        result="capture complete: "+std::to_string(s.samples)+" samples";
+        return true;
+    }
+    if(process.pid()!=s.pid||!process.alive()||
+       !ue.saneObject(s.character)||
+       ue.className(ue.classOf(s.character))!="Abiotic_PlayerCharacter_C"||
+       process.pointer(s.character+0x1A50)!=s.rifle||
+       !ue.saneObject(s.rifle)||
+       ue.className(ue.classOf(s.rifle))!="Abiotic_Weapon_QuillRifle_C"){
+        s.active=false;result="capture stopped: weapon or character changed";
+        return true;
+    }
+    Camera cam{};
+    if(!ue.readCamera(s.cameraManager,cam)){
+        s.active=false;result="capture stopped: camera unavailable";
+        return true;
+    }
+    std::ostringstream row;
+    row<<std::setprecision(12)<<now-s.startMs
+       <<","<<cam.rotation.x<<","<<cam.rotation.y<<","<<cam.rotation.z;
+    const auto d=[&](Addr addr){
+        const auto value=process.get<double>(addr);
+        row<<",";
+        if(value&&std::isfinite(*value)&&std::abs(*value)<1e12)
+            row<<*value;
+    };
+    const auto f=[&](Addr addr){
+        const auto value=process.get<float>(addr);
+        row<<",";
+        if(value&&std::isfinite(*value)&&std::abs(*value)<1e6f)
+            row<<*value;
+    };
+    d(s.character+0x1898);
+    d(s.character+0x1A00);
+    f(s.character+0x17B0);
+    f(s.character+0x1800);
+    d(s.rifle+0xB28);
+    row<<","<<writes<<"\n";
+    s.csv+=row.str();
+    ++s.samples;s.nextMs=now+20;
+    return false;
+}
 void cancelCameraRecoilCapture(CameraRecoilSession& s){s.active=false;}
 bool saveCameraRecoilCapture(const CameraRecoilSession& s){
     if(!s.samples)return false;
