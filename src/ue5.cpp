@@ -116,7 +116,8 @@ ScreenPoint project(const Camera& cam,const Vec3& pos,int width,int height){
     return {screenX,screenY,dist,std::isfinite(screenX)&&std::isfinite(screenY)&&screenX>=0&&screenY>=0&&screenX<width&&screenY<height};
 }
 Category categorize(const std::string& n){
-    if(n=="NPC_Monster_Pest_C"||n=="NPC_Monster_Peccary_C"||n=="NPC_Monster_Carbuncle_C"||n=="NPC_Robot_Security_C")return Category::Hostile;
+    // Include later-game hostile families without guessing individual class names.
+    if((begins(n,"NPC_Monster_")||begins(n,"NPC_Robot_"))&&n.ends_with("_C"))return Category::Hostile;
     if(n=="NarrativeNPC_Human_ParentBP_C"||n=="NarrativeNPC_Human_Hologram_C")return Category::NarrativeNpc;
     if(n=="Abiotic_Item_Dropped_C")return Category::Dropped;
     if(begins(n,"Resource_MicroNode_")&&n.ends_with("_C"))return Category::MicroLoot;
