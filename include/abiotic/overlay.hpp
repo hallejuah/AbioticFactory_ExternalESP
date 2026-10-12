@@ -28,6 +28,7 @@ private:
     void probeNearestPropertyValues();
     void probeNearestBones();
     void probeNearestNativeOutline();
+    void probeNearestBoolMasks();
     struct ActorSample { Vec3 pos{}; Life life{}; bool valid{}; };
     std::unordered_map<Addr,ActorSample> actorSamples_;
     ULONGLONG lastActorSample_{};
