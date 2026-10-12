@@ -14,7 +14,7 @@ enum class Category { Hostile, NarrativeNpc, Container, Dropped, MicroLoot, Reso
 struct Actor { Addr address{}; std::string name; Category category{Category::Unknown}; };
 struct Life { float hp{}, armor{}; bool dead{}; bool valid{}; bool armorValid{}; };
 struct ScreenPoint { double x{}, y{}, distance{}; bool visible{}; };
-struct Row { Actor actor; ScreenPoint screen; Life life; bool hasLife{}; };
+struct Row { Actor actor; ScreenPoint screen; ScreenPoint boxTop; Life life; bool hasLife{},hasBoxTop{}; };
 struct Snapshot { Camera camera; std::vector<Actor> actors; std::vector<Addr> levels; Addr world{}; Addr cameraManager{}; std::uint64_t generation{}; };
 struct Config {
     bool active{true}, hideDead{true}, showHp{true}, showBars{true}, showArmor{true};
