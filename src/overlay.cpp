@@ -172,6 +172,7 @@ void Overlay::hotkeys(){
     if(edge(VK_END)){stopRecoilTrial();restoreTrial();if(customDepthTrial_.active)return;DestroyWindow(overlay_);return;}
     if(edge(VK_NUMPAD1))probeRecoilTrial();
     if(edge(VK_NUMPAD2))probeNeedleRifle();
+    if(edge(VK_NUMPAD3))probeCameraRecoil();
     if(edge(VK_NUMPAD0))showHotkeyStatus(L"Numpad1: NoRecoil | Numpad2: samples | Numpad0: help", "Numpad help");
     if(edge(VK_F3))toggleCategory(Category::ResourceNode);
     if(edge(VK_F4))toggleCategory(Category::MicroLoot);
