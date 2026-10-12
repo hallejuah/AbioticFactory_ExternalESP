@@ -2,6 +2,7 @@
 #include "scanner.hpp"
 #include "settings.hpp"
 #include "bone_points.hpp"
+#include "customdepth_trial.hpp"
 namespace abiotic {
 class Overlay {
 public:
@@ -29,6 +30,8 @@ private:
     void probeNearestBones();
     void probeNearestNativeOutline();
     void probeNearestBoolMasks();
+    void runCustomDepthTrial();
+    void restoreTrial();
     struct ActorSample { Vec3 pos{}; Life life{}; bool valid{}; };
     std::unordered_map<Addr,ActorSample> actorSamples_;
     ULONGLONG lastActorSample_{};
@@ -40,6 +43,7 @@ private:
     std::vector<HWND> controls_;
     Process proc_;UE5 ue_;Scanner scanner_;Config cfg_;
     RECT gameRect_{};std::vector<Row> rows_;
+    CustomDepthTrial customDepthTrial_{};
     std::vector<BoneDebugPoint> boneDebugPoints_;
     ULONGLONG lastBoneSample_{};
     unsigned long long tickCount_{};
