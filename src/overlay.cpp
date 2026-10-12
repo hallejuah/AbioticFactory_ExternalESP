@@ -520,20 +520,6 @@ void Overlay::tick(){
     if((int)rows_.size()>cfg_.maxLabels)rows_.resize(cfg_.maxLabels);
     cfg_.skeletonMode=0;
     boneDebugPoints_.clear();
-    else if(!lastBoneSample_||now-lastBoneSample_>=50){
-        lastBoneSample_=now;
-        boneDebugPoints_.clear();
-        // One Pest only: no unknown skeleton layouts for other enemy types.
-        const Row* chosen=nullptr;
-        double best=1.0e100;
-        for(const auto& row:rows_){
-            if(row.actor.name!="NPC_Monster_Pest_C")continue;
-            const double dx=row.screen.x-w*0.5,dy=row.screen.y-h*0.5;
-            const double d=dx*dx+dy*dy;
-            if(d<best){best=d;chosen=&row;}
-        }
-        if(chosen)boneDebugPoints_=projectPestBones(ue_,chosen->actor.address,cam,w,h);
-    }
     InvalidateRect(overlay_,nullptr,FALSE);
 }
 void Overlay::paint(HDC dc){
