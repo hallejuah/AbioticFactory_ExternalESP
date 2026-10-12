@@ -204,7 +204,7 @@ void Overlay::probeRecoilTrial(){
         status_=ok?L"NoRecoil trial active (1.5s)":
                    L"NoRecoil unavailable: check rifle and idle state";
     }
-    showHotkeyStatus(status_,reason);
+    showHotkeyStatus(status_+(reason.empty()?L"":L" | "+std::wstring(reason.begin(),reason.end())),reason);
 }
 void Overlay::stopRecoilTrial(){
     if(!noRecoilTrial_.active)return;
@@ -217,7 +217,7 @@ void Overlay::probeNeedleRifle(){
     std::string reason;
     const bool started=startWeaponSampling(ue_,weaponSample_,GetTickCount64(),reason);
     showHotkeyStatus(started?L"Numpad2: recording 2 seconds":
-        L"Numpad2: cannot start; equip Quill Rifle",reason);
+        (L"Numpad2: "+std::wstring(reason.begin(),reason.end())),reason);
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
