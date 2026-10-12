@@ -1,4 +1,7 @@
 #include "abiotic/scanner.hpp"
+#include "abiotic/settings.hpp"
+#include <fstream>
+#include <map>
 #include <unordered_set>
 #include <sstream>
 #include <algorithm>
@@ -69,6 +72,30 @@ bool Scanner::refresh(std::string& error){
     }
     if(!sameSignature(start,finish)){error="Actor lists changed mid-scan; retry later";return false;}
     next.generation=current_.generation+1;
-    current_=std::move(next);signature_=std::move(start);error.clear();return true;
+    current_=std::move(next);signature_=std::move(start);
+    // Overwrite on each successful scan: current late-game class families,
+    // including NPC_ candidates that the classifier still excludes.
+    {
+        std::map<std::string,int> counts;
+        for(const auto& actor:current_.actors)
+            if(actor.name.rfind("NPC_",0)==0)++counts[actor.name];
+        std::map<std::string,bool> unknownNpc;
+        for(const auto& [classPtr,className]:classes){
+            (void)classPtr;
+            if(className.rfind("NPC_",0)==0&&categorize(className)==Category::Unknown)
+                unknownNpc[className]=true;
+        }
+        std::ofstream file(settingsPath().parent_path()/L"abiotic_hostile_classes.txt",
+                           std::ios::trunc);
+        if(file){
+            file<<"Abiotic ESP v2.0 NPC class coverage (latest successful scan)\n"
+                <<"recognized NPC class counts:\n";
+            for(const auto& [name,count]:counts)file<<"  "<<name<<" count="<<count<<"\n";
+            file<<"unclassified NPC_ class candidates (NOT auto-labelled hostile):\n";
+            for(const auto& [name,present]:unknownNpc){(void)present;file<<"  "<<name<<"\n";}
+            file<<"Note: an NPC_ prefix alone does not establish hostility.\n";
+        }
+    }
+    error.clear();return true;
 }
 }
