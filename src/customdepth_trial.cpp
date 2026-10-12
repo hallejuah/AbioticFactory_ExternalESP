@@ -63,7 +63,10 @@ bool validate(UE5& ue,Addr actor,Addr& mesh,std::string& reason){
 }
 bool writeChecked(const Process& process,Addr address,std::uint8_t expected,
                   std::uint8_t desired,std::string& reason){
-    if(!validPtr(address)||!process.alive()){reason="process/address invalid";return false;}
+    // A reflected uint8 field is NOT 8-byte aligned (mesh+0x269).
+    if(address<0x10000 || address>=0x0000800000000000ULL || !process.alive()){
+        reason="process/address invalid";return false;
+    }
     HANDLE handle=OpenProcess(PROCESS_VM_READ|PROCESS_VM_WRITE|PROCESS_VM_OPERATION|PROCESS_QUERY_LIMITED_INFORMATION,
                               FALSE,process.pid());
     if(!handle){reason="cannot obtain VM_WRITE access";return false;}
