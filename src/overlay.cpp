@@ -78,6 +78,7 @@ bool Overlay::reconnect(){
     lastReconnectAttempt_=now;
     stopRecoilTrial();
     cancelWeaponSampling(weaponSample_);
+    cancelCameraRecoilCapture(cameraRecoil_);
     proc_.detach();
     ue_.clearCaches();
     scanner_.reset();
@@ -172,7 +173,8 @@ void Overlay::hotkeys(){
     if(edge(VK_END)){stopRecoilTrial();restoreTrial();if(customDepthTrial_.active)return;DestroyWindow(overlay_);return;}
     if(edge(VK_NUMPAD1))probeRecoilTrial();
     if(edge(VK_NUMPAD2))probeNeedleRifle();
-    if(edge(VK_NUMPAD0))showHotkeyStatus(L"Numpad1: NoRecoil | Numpad2: samples | Numpad0: help", "Numpad help");
+    if(edge(VK_NUMPAD3))probeCameraRecoil();
+    if(edge(VK_NUMPAD0))showHotkeyStatus(L"Num1: NoRecoil | Num2: weapon | Num3: camera | Num0: help", "Numpad help");
     if(edge(VK_F3))toggleCategory(Category::ResourceNode);
     if(edge(VK_F4))toggleCategory(Category::MicroLoot);
     if(edge(VK_F5))toggleCategory(Category::Dropped);
@@ -211,6 +213,14 @@ void Overlay::stopRecoilTrial(){
     std::string reason;
     stopNoRecoilTrial(noRecoilTrial_,reason);
     OutputDebugStringA(("NoRecoil: "+reason+"\n").c_str());
+}
+void Overlay::probeCameraRecoil(){
+    if(!connected_||cameraRecoil_.active)return;
+    std::string reason;
+    const bool started=startCameraRecoilCapture(
+        ue_,proc_,cameraRecoil_,GetTickCount64(),reason);
+    showHotkeyStatus(started?L"Numpad3: camera capture 2 seconds":
+        L"Numpad3: "+std::wstring(reason.begin(),reason.end()),reason);
 }
 void Overlay::probeNeedleRifle(){
     if(!connected_||weaponSample_.active)return;
@@ -449,6 +459,15 @@ void Overlay::probeOutlineSurvey(){
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
+    if(cameraRecoil_.active){
+        std::string result;
+        if(stepCameraRecoilCapture(ue_,proc_,cameraRecoil_,GetTickCount64(),
+                                   noRecoilTrial_.writes,result)){
+            const bool saved=saveCameraRecoilCapture(cameraRecoil_);
+            showHotkeyStatus(saved?L"Numpad3: camera CSV saved":
+                L"Numpad3: camera CSV save failed",result);
+        }
+    }
     if(noRecoilTrial_.active){
         std::string note;
         if(tickNoRecoilTrial(ue_,proc_,noRecoilTrial_,GetTickCount64(),note)){
@@ -475,6 +494,7 @@ void Overlay::tick(){
         if(customDepthTrial_.active)return;
         stopRecoilTrial();
         cancelWeaponSampling(weaponSample_);
+        cancelCameraRecoilCapture(cameraRecoil_);
         connected_=false;game_=nullptr;gameRect_={};
         scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
         outlineSurveyState_=OutlineSurveyState{};

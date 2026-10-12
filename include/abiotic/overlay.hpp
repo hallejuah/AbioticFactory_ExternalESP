@@ -6,6 +6,7 @@
 #include "outline_survey.hpp"
 #include "weapon_research.hpp"
 #include "no_recoil_trial.hpp"
+#include "camera_recoil.hpp"
 namespace abiotic {
 class Overlay {
 public:
@@ -52,6 +53,8 @@ private:
     CustomDepthTrial customDepthTrial_{};
     WeaponSampleSession weaponSample_{};
     NoRecoilTrial noRecoilTrial_{};
+    CameraRecoilSession cameraRecoil_{};
+    void probeCameraRecoil();
     void stopRecoilTrial();
     void probeRecoilTrial();
     void showHotkeyStatus(const std::wstring&, const std::string&);
