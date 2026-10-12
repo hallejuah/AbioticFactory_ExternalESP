@@ -30,6 +30,7 @@ private:
     void probeNearestBones();
     void probeNearestNativeOutline();
     void probeNearestBoolMasks();
+    void probeNearestRenderPipeline();
     void runCustomDepthTrial();
     void restoreTrial();
     struct ActorSample { Vec3 pos{}; Life life{}; bool valid{}; };
