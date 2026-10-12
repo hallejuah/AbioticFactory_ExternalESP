@@ -182,6 +182,25 @@ void Overlay::hotkeys(){
     // v1.7: disable active memory trials while researching render pipeline.
     // F12 outline research disabled in clean Box ESP.
 }
+void Overlay::probeRecoilTrial(){
+    std::string reason;
+    if(noRecoilTrial_.active){
+        stopNoRecoilTrial(noRecoilTrial_,reason);
+        status_=L"NoRecoil trial stopped";
+    }else if(connected_){
+        const bool ok=startNoRecoilTrial(ue_,proc_,noRecoilTrial_,
+                                        GetTickCount64(),reason);
+        status_=ok?L"NoRecoil trial active (1.5s)":
+                   L"NoRecoil unavailable: check rifle and idle state";
+    }
+    OutputDebugStringA(("NoRecoil: "+reason+"\n").c_str());
+}
+void Overlay::stopRecoilTrial(){
+    if(!noRecoilTrial_.active)return;
+    std::string reason;
+    stopNoRecoilTrial(noRecoilTrial_,reason);
+    OutputDebugStringA(("NoRecoil: "+reason+"\n").c_str());
+}
 void Overlay::probeNeedleRifle(){
     if(!connected_||weaponSample_.active)return;
     std::string reason;
