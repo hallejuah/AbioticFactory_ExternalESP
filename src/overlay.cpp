@@ -9,6 +9,7 @@
 #include "abiotic/bool_masks.hpp"
 #include "abiotic/render_pipeline.hpp"
 #include "abiotic/outline_survey.hpp"
+#include "abiotic/weapon_research.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cwchar>
@@ -175,9 +176,18 @@ void Overlay::hotkeys(){
     if(edge(VK_F8))cfg_.active=!cfg_.active;
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
-    // F11 research probe disabled in clean Box ESP.
+    if(edge(VK_F11))probeNeedleRifle(); // read-only needle rifle research
     // v1.7: disable active memory trials while researching render pipeline.
     // F12 outline research disabled in clean Box ESP.
+}
+void Overlay::probeNeedleRifle(){
+    if(!connected_)return;
+    const auto report=inspectNeedleRifle(ue_);
+    const bool saved=appendNeedleRifleReport(report);
+    OutputDebugStringA(report.report.c_str());
+    status_=saved?L"Needle rifle report: abiotic_needle_rifle_research.txt":
+        L"Needle rifle report write failed";
+    if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -680,7 +690,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit. No game memory writes in v1.7.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"Box ESP: research keys F2/F11/F12 off",0,18,330,310,22);
+        add(L"STATIC",L"Box ESP: F11 weapon research (read-only)",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
