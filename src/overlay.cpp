@@ -402,10 +402,12 @@ void Overlay::probeNearestRenderPipeline(){
 }
 void Overlay::probeOutlineSurvey(){
     if(!connected_||scanner_.data().actors.empty())return;
-    const auto report=surveyOutlineActivation(ue_,scanner_.data().actors);
+    const auto report=surveyOutlineActivation(ue_,scanner_.data(),outlineSurveyState_);
     const bool saved=appendOutlineSurvey(report);
     OutputDebugStringA(report.text.c_str());
-    status_=saved?L"Outline survey: abiotic_outline_survey.txt":L"Outline survey write failed";
+    status_=saved?(L"Outline survey "+std::to_wstring(report.nextIndex)+L"/"+
+        std::to_wstring(report.total)+L": abiotic_outline_survey.txt"):
+        L"Outline survey write failed";
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
@@ -671,7 +673,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit. No game memory writes in v1.7.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"F12: outline survey (F2 disabled)",0,18,330,310,22);
+        add(L"STATIC",L"F12: paginated outline survey (F2 disabled)",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
