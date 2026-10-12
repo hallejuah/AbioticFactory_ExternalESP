@@ -458,6 +458,15 @@ void Overlay::probeOutlineSurvey(){
     if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
+    if(cameraRecoil_.active){
+        std::string result;
+        if(stepCameraRecoilCapture(ue_,proc_,cameraRecoil_,GetTickCount64(),
+                                   noRecoilTrial_.writes,result)){
+            const bool saved=saveCameraRecoilCapture(cameraRecoil_);
+            showHotkeyStatus(saved?L"Numpad3: camera CSV saved":
+                L"Numpad3: camera CSV save failed",result);
+        }
+    }
     if(noRecoilTrial_.active){
         std::string note;
         if(tickNoRecoilTrial(ue_,proc_,noRecoilTrial_,GetTickCount64(),note)){
