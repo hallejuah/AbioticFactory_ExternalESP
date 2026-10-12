@@ -53,6 +53,7 @@ private:
     WeaponSampleSession weaponSample_{};
     NoRecoilTrial noRecoilTrial_{};
     void stopRecoilTrial();
+    void probeRecoilTrial();
     OutlineSurveyState outlineSurveyState_{};
     std::vector<BoneDebugPoint> boneDebugPoints_;
     ULONGLONG lastBoneSample_{};
