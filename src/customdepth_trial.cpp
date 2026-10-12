@@ -90,17 +90,27 @@ bool startCustomDepthTrial(UE5& ue,const Process& process,Addr actor,
     const auto original=process.get<std::uint8_t>(address);
     if(!original){log="byte read failed";return false;}
     if((*original&ExpectedMask)!=0){log="CustomDepth bit already set; refusing overwrite";return false;}
-    // This one-byte operation does NOT call UE SetRenderCustomDepth or update scene proxies.
-    if(!writeChecked(process,address,*original,static_cast<std::uint8_t>(*original|ExpectedMask),log))
+    // Arm recovery BEFORE attempting the write: the OS can report partial
+    // failure after a byte has already changed.
+    trial={actor,mesh,address,*original,process.pid(),GetTickCount64()+5000,true};
+    const std::uint8_t desired=static_cast<std::uint8_t>(*original|ExpectedMask);
+    if(!writeChecked(process,address,*original,desired,log)){
+        const std::string failure=log;
+        std::string recovery;
+        const bool recovered=restoreCustomDepthTrial(ue,process,trial,recovery);
+        log=failure+"; recovery "+(recovered?"verified":"pending")+": "+recovery;
         return false;
+    }
     const auto confirmed=process.get<std::uint8_t>(address);
     if(!confirmed||(*confirmed&ExpectedMask)==0){
-        std::string recover;
-        writeChecked(process,address,static_cast<std::uint8_t>(*original|ExpectedMask),*original,recover);
-        log="write not confirmed; attempted immediate restoration: "+recover;return false;
+        std::string recovery;
+        const bool recovered=restoreCustomDepthTrial(ue,process,trial,recovery);
+        log="post-write verification failed; recovery "+
+            std::string(recovered?"verified":"pending")+": "+recovery;
+        return false;
     }
-    trial={actor,mesh,address,*original,process.pid(),GetTickCount64()+5000,true};
-    log="trial ON for max 5s; renderer effect not guaranteed";return true;
+    log="CustomDepth bit set, timeout 5 seconds; UE render refresh not guaranteed";
+    return true;
 }
 bool restoreCustomDepthTrial(UE5& ue,const Process& process,
                              CustomDepthTrial& trial,std::string& log){
