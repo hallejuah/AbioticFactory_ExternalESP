@@ -213,6 +213,14 @@ void Overlay::stopRecoilTrial(){
     stopNoRecoilTrial(noRecoilTrial_,reason);
     OutputDebugStringA(("NoRecoil: "+reason+"\n").c_str());
 }
+void Overlay::probeCameraRecoil(){
+    if(!connected_||cameraRecoil_.active)return;
+    std::string reason;
+    const bool started=startCameraRecoilCapture(
+        ue_,proc_,cameraRecoil_,GetTickCount64(),reason);
+    showHotkeyStatus(started?L"Numpad3: camera capture 2 seconds":
+        L"Numpad3: "+std::wstring(reason.begin(),reason.end()),reason);
+}
 void Overlay::probeNeedleRifle(){
     if(!connected_||weaponSample_.active)return;
     std::string reason;
