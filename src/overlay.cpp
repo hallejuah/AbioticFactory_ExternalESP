@@ -421,6 +421,7 @@ void Overlay::tick(){
         if(customDepthTrial_.active)return;
         connected_=false;game_=nullptr;gameRect_={};
         scanner_.reset();ue_.clearCaches();rows_.clear();actorSamples_.clear();lastActorSample_=0;
+        outlineSurveyState_=OutlineSurveyState{};
         boneDebugPoints_.clear();lastBoneSample_=0;
         proc_.detach();scanRequested_=false;
         status_=L"Game closed; waiting to reconnect";
