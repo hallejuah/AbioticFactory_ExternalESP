@@ -175,11 +175,11 @@ void Overlay::hotkeys(){
     if(edge(VK_F8))cfg_.active=!cfg_.active;
     if(edge(VK_F9))scanRequested_=true;
     if(edge(VK_F10))showPanel();
-    if(edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;
+    if(false && edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;
         if(panelOpen_)updatePanel();}
-    if(edge(VK_F11))probeNearestEnemy();
+    // F11 research probe disabled in clean Box ESP.
     // v1.7: disable active memory trials while researching render pipeline.
-    if(edge(VK_F12))probeOutlineSurvey(); // F12: v1.8 sampled outline activation survey
+    // F12 outline research disabled in clean Box ESP.
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -496,6 +496,17 @@ void Overlay::tick(){
         if(pt.distance>(loot?cfg_.lootDistance:cfg_.maxDistance))continue;
         Row row;row.actor=actor;row.screen=pt;
         if(actor.category==Category::Hostile){
+            // Approximate vertical bounds; not a per-model silhouette or collision box.
+            const double nominalHeight=
+                actor.name=="NPC_Monster_Pest_C"?85.0:
+                actor.name=="NPC_Monster_Carbuncle_C"?100.0:
+                actor.name=="NPC_Monster_Peccary_C"?155.0:
+                actor.name=="NPC_Robot_Security_C"?190.0:165.0;
+            const Vec3 upper{sample.pos.x,sample.pos.y,sample.pos.z+nominalHeight};
+            row.boxTop=project(cam,upper,w,h);
+            row.hasBoxTop=row.boxTop.visible;
+        }
+        if(actor.category==Category::Hostile){
             row.life=sample.life;row.hasLife=row.life.valid;
             if(cfg_.hideDead&&verifiedLife(actor.name)&&row.hasLife&&row.life.hp<=0.001&&row.life.dead)continue;
         }
@@ -508,6 +519,7 @@ void Overlay::tick(){
         return x==y?a.screen.distance<b.screen.distance:x<y;
     });
     if((int)rows_.size()>cfg_.maxLabels)rows_.resize(cfg_.maxLabels);
+    cfg_.skeletonMode=0;
     if(cfg_.skeletonMode==0)boneDebugPoints_.clear();
     else if(!lastBoneSample_||now-lastBoneSample_>=50){
         lastBoneSample_=now;
@@ -531,7 +543,7 @@ void Overlay::paint(HDC dc){
     SetBkMode(dc,TRANSPARENT);
     if(!cfg_.active||!focused()&&cfg_.focusOnly)return;
     for(auto& row:rows_)drawRow(dc,row);
-    if(cfg_.skeletonMode>0)drawBoneDebug(dc);
+    // Skeleton display disabled in v2.0 clean box mode.
 }
 void Overlay::drawBoneDebug(HDC dc){
     // The links are guessed from the observed Pest screenshot. NOT UE bone parents.
@@ -579,7 +591,16 @@ void Overlay::drawRow(HDC dc,const Row& row){
     COLORREF c=color(row.actor.category);
     HPEN pen=CreatePen(PS_SOLID,2,c);auto oldPen=SelectObject(dc,pen);
     auto oldBrush=SelectObject(dc,GetStockObject(NULL_BRUSH));
-    Ellipse(dc,x-3,y-3,x+3,y+3);
+    if(row.actor.category==Category::Hostile){
+        // Root-to-head projected approximate 2D box. Unknown creature proportions
+        // are estimates until real bounds can be identified.
+        const int height=std::clamp(
+            row.hasBoxTop?std::abs(y-static_cast<int>(std::lround(row.boxTop.y))):44,
+            24,360);
+        const int width=std::clamp(static_cast<int>(std::lround(height*0.58)),18,230);
+        const int top=row.hasBoxTop?std::min(y,static_cast<int>(std::lround(row.boxTop.y))):y-height/2;
+        Rectangle(dc,x-width/2,top,x+(width+1)/2,top+height);
+    }else Ellipse(dc,x-3,y-3,x+3,y+3);
     SelectObject(dc,oldBrush);SelectObject(dc,oldPen);DeleteObject(pen);
     std::wstring text=humanName(row.actor)+L" "+formatNum(row.screen.distance/100.0)+L"m";
     bool hostile=row.actor.category==Category::Hostile;
@@ -666,7 +687,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"Values apply immediately.",0,18,226,310,20);break;
       case 3:
         chk(L"Only when game/menu focused",10,cfg_.focusOnly,60);
-        chk(L"Skeleton debug (Pest only)",11,cfg_.skeletonMode>0,88);
+        add(L"STATIC",L"Clean Box ESP: skeleton probes disabled",0,18,88,310,22);
         add(L"STATIC",cfg_.skeletonMode==2?L"Mode: points + lines":
             cfg_.skeletonMode==1?L"Mode: points only":L"Mode: off",0,35,110,250,19);
         step(L"Scan interval",6,cfg_.scanIntervalSeconds,L"s",130);
@@ -674,7 +695,7 @@ void Overlay::updatePanel(){
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
         add(L"STATIC",L"End: exit. No game memory writes in v1.7.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"F12: paginated outline survey (F2 disabled)",0,18,330,310,22);
+        add(L"STATIC",L"Box ESP: research keys F2/F11/F12 off",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
