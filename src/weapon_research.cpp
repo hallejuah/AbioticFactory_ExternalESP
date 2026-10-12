@@ -209,6 +209,114 @@ WeaponResearchResult inspectNeedleRifle(UE5& ue){
        <<"No rapid-fire/recoil patch, function invocation or memory write.\n\n";
     result.success=true;result.report=out.str();return result;
 }
+
+// Short, nonblocking 20 ms snapshots; never chase unvalidated pointers.
+std::filesystem::path weaponSamplesPath(){
+    return settingsPath().parent_path()/L"abiotic_quillrifle_samples.csv";
+}
+void cancelWeaponSampling(WeaponSampleSession& session){
+    session.active=false;
+}
+bool startWeaponSampling(UE5& ue,WeaponSampleSession& session,
+                         std::uint64_t nowMs,std::string& reason){
+    if(session.active){reason="Sampling already active";return false;}
+    Addr world=0,camera=0;
+    if(!ue.readChain(world,camera)||!ue.anchorCheck(world)){
+        reason="Invalid world/camera chain";return false;
+    }
+    const Addr gi=ue.memory().pointer(world+offsets::WorldGI);
+    TArray players{};
+    if(!ue.saneObject(gi)||!ue.array(gi+offsets::GIPlayers,256,players)){
+        reason="Invalid local players";return false;
+    }
+    const Addr lp=ue.memory().pointer(players.data);
+    const Addr controller=ue.memory().pointer(lp+offsets::LPController);
+    if(!ue.saneObject(lp)||!ue.saneObject(controller)||
+       ue.memory().pointer(controller+offsets::ControllerCamera)!=camera){
+        reason="Controller identity mismatch";return false;
+    }
+    const Addr character=ue.memory().pointer(controller+0xF78);
+    if(!ue.saneObject(character)||
+       ue.className(ue.classOf(character))!="Abiotic_PlayerCharacter_C"||
+       ue.memory().pointer(controller+0x2D8)!=character){
+        reason="Character identity mismatch";return false;
+    }
+    const Addr item=ue.memory().pointer(character+0x1A50);
+    if(!ue.saneObject(item)||
+       ue.className(ue.classOf(item))!="Abiotic_Weapon_QuillRifle_C"){
+        reason="Equip Quill Rifle first";return false;
+    }
+    session={};
+    session.character=character;
+    session.item=item;
+    session.startMs=nowMs;
+    session.nextMs=nowMs;
+    session.active=true;
+    session.csv="\n# v2.5 QuillRifle read-only F11 capture, 2000ms max, ~20ms interval\n"
+                "elapsed_ms,fire_time,fire_delay,spread,sway_multiplier,sway_speed,"
+                "aim_recoil,controller_recoil_track,recoil_track,burst_counter\n";
+    reason="Sampling started: shoot during the next 2 seconds";
+    return true;
+}
+bool stepWeaponSampling(UE5& ue,WeaponSampleSession& session,
+                        std::uint64_t nowMs,std::string& summary){
+    if(!session.active)return false;
+    if(nowMs<session.nextMs)return false;
+    if(nowMs-session.startMs>=2000||session.samples>=100){
+        session.active=false;
+        summary="Capture complete: "+std::to_string(session.samples)+" samples";
+        return true;
+    }
+    // Validate the same character and item on every sample; don't mix data
+    // from a new weapon or a freed UObject into an existing capture.
+    if(!ue.saneObject(session.character)||
+       ue.className(ue.classOf(session.character))!="Abiotic_PlayerCharacter_C"||
+       ue.memory().pointer(session.character+0x1A50)!=session.item||
+       !ue.saneObject(session.item)||
+       ue.className(ue.classOf(session.item))!="Abiotic_Weapon_QuillRifle_C"){
+        session.active=false;
+        summary="Capture stopped: character or rifle changed";
+        return true;
+    }
+    std::ostringstream row;
+    row<<nowMs-session.startMs;
+    const auto d=[&](Addr addr){
+        const auto v=ue.memory().get<double>(addr);
+        row<<",";
+        if(v&&std::isfinite(*v)&&std::abs(*v)<1e12)
+            row<<std::setprecision(12)<<*v;
+    };
+    const auto f=[&](Addr addr){
+        const auto v=ue.memory().get<float>(addr);
+        row<<",";
+        if(v&&std::isfinite(*v)&&std::abs(*v)<1e6f)
+            row<<std::setprecision(9)<<*v;
+    };
+    d(session.character+0x1898);
+    d(session.item+0xB28);
+    d(session.character+0x19C0);
+    d(session.character+0x19D8);
+    d(session.character+0x19E0);
+    d(session.character+0x1A00);
+    f(session.character+0x17B0);
+    f(session.character+0x1800);
+    const auto burst=ue.memory().get<std::int32_t>(session.character+0x2878);
+    row<<",";
+    if(burst&&*burst>=0&&*burst<=100000)row<<*burst;
+    row<<"\n";
+    session.csv+=row.str();
+    ++session.samples;
+    session.nextMs=nowMs+20;
+    return false;
+}
+bool appendWeaponSamples(const WeaponSampleSession& session){
+    if(session.samples==0)return false;
+    std::ofstream out(weaponSamplesPath(),std::ios::app);
+    if(!out)return false;
+    out<<session.csv;
+    return out.good();
+}
+
 bool appendNeedleRifleReport(const WeaponResearchResult& report){
     std::ofstream file(needleRifleReportPath(),std::ios::app);
     if(!file)return false;
