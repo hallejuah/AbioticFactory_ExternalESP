@@ -7,6 +7,7 @@
 #include "abiotic/bone_probe.hpp"
 #include "abiotic/native_outline.hpp"
 #include "abiotic/bool_masks.hpp"
+#include "abiotic/render_pipeline.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cwchar>
@@ -176,8 +177,8 @@ void Overlay::hotkeys(){
     if(edge('B')){cfg_.skeletonMode=(cfg_.skeletonMode+1)%3;boneDebugPoints_.clear();lastBoneSample_=0;
         if(panelOpen_)updatePanel();}
     if(edge(VK_F11))probeNearestEnemy();
-    if(edge(VK_F2))runCustomDepthTrial();
-    if(edge(VK_F12))probeNearestBoolMasks(); // F12: v1.5 bool metadata probe
+    // v1.7: disable active memory trials while researching render pipeline.
+    if(edge(VK_F12))probeNearestRenderPipeline(); // F12: v1.7 read-only render pipeline
 }
 void Overlay::probeNearestEnemy(){
     if(!connected_||rows_.empty())return;
@@ -376,6 +377,27 @@ void Overlay::restoreTrial(){
      out<<"tick="<<GetTickCount64()<<" restored="<<(restored?"yes":"no")<<" "<<note<<"\n";}
     if(restored)status_=L"CustomDepth original bit restored";
     else status_=L"CustomDepth restore pending/failed; see log";
+}
+void Overlay::probeNearestRenderPipeline(){
+    if(!connected_ || rows_.empty())return;
+    const int width=gameRect_.right-gameRect_.left;
+    const int height=gameRect_.bottom-gameRect_.top;
+    const Row* chosen=nullptr;
+    double best=1.0e100;
+    for(const auto& row:rows_){
+        if(row.actor.category!=Category::Hostile)continue;
+        if(row.hasLife&&row.life.dead)continue;
+        const double dx=row.screen.x-width*0.5;
+        const double dy=row.screen.y-height*0.5;
+        const double score=dx*dx+dy*dy;
+        if(score<best){best=score;chosen=&row;}
+    }
+    if(!chosen)return;
+    const auto report=inspectRenderPipeline(ue_,chosen->actor.address,chosen->actor.name);
+    const bool saved=appendRenderPipelineReport(report);
+    OutputDebugStringA(report.text.c_str());
+    status_=saved?L"Render pipeline report: abiotic_render_pipeline.txt":L"Render report write failed";
+    if(panel_&&panelOpen_)SetWindowTextW(panel_,(L"Abiotic ESP | "+status_).c_str());
 }
 void Overlay::tick(){
     if(customDepthTrial_.active && GetTickCount64()>=customDepthTrial_.deadline)restoreTrial();
@@ -638,9 +660,9 @@ void Overlay::updatePanel(){
         step(L"Scan interval",6,cfg_.scanIntervalSeconds,L"s",130);
         add(L"STATIC",L"F3/F4/F5: loot    F6: HP    F7: dead",0,18,168,310,22);
         add(L"STATIC",L"F8: ESP    F9: rescan    F10: panel",0,18,195,310,22);
-        add(L"STATIC",L"End: exit. F2 writes one bit; rest read-only.",0,18,222,310,22);
+        add(L"STATIC",L"End: exit. No game memory writes in v1.7.",0,18,222,310,22);
         add(L"STATIC",L"MaxArmor: research TODO (per robot).",0,18,255,310,22);
-        add(L"STATIC",L"F2: CustomDepth 5s   F12: bool masks",0,18,330,310,22);
+        add(L"STATIC",L"F12: render pipeline report (F2 disabled)",0,18,330,310,22);
         add(L"STATIC",L"Scans: "+std::to_wstring(scanCount_)+L" / errors: "+std::to_wstring(scanErrors_),0,18,282,310,22);
         add(L"STATIC",L"RPM errors: "+std::to_wstring(proc_.readFailures())+L" / reconnects: "+std::to_wstring(reconnectCount_),0,18,305,310,22);break;
     }
